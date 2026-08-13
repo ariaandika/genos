@@ -1,12 +1,15 @@
 //! Error types.
-use core::ffi::{CStr, c_char};
-use core::{error, fmt};
+use core::ffi::CStr;
 use core::num::NonZeroU8;
+use core::{error, fmt};
+use std::task::Poll;
+
+use crate::fd::FromRawFd;
 
 // ===== traits =====
 
 /// Error type that can be created from error code.
-pub trait FromErrCode: Sized {
+pub(crate) trait FromErrCode: Sized {
     /// Creates error with given error code.
     fn from_err_code(code: ErrCode) -> Self;
 
@@ -15,6 +18,58 @@ pub trait FromErrCode: Sized {
     fn errno() -> Self {
         Self::from_err_code(ErrCode::errno())
     }
+
+    /// Returns `Err` if `res` is -1.
+    #[inline]
+    fn e<T: FromOkCode>(res: i32) -> Result<T, Self> {
+        if res == -1 {
+            return Err(Self::errno());
+        }
+        Ok(T::from_ok_code(res))
+    }
+
+    /// Returns `Err` if `res` is negative.
+    #[inline]
+    fn io(res: isize) -> Result<usize, Self> {
+        match usize::try_from(res) {
+            Ok(ok) => Ok(ok),
+            Err(_) => Err(Self::errno()),
+        }
+    }
+
+    #[inline]
+    fn ep<T>(res: Result<T, Self>) -> Poll<Result<T, Self>>
+    where
+        Self: Into<ErrCode>,
+    {
+        match res {
+            Ok(ok) => Poll::Ready(Ok(ok)),
+            Err(err) => {
+                let code = err.into();
+                if code.would_block() {
+                    Poll::Pending
+                } else {
+                    Poll::Ready(Err(Self::from_err_code(code)))
+                }
+            }
+        }
+    }
+
+    #[inline]
+    unsafe fn fd<T: FromRawFd>(fd: i32) -> Result<T, Self> {
+        if fd == -1 {
+            return Err(Self::errno());
+        }
+        Ok(unsafe { T::from_raw_fd(fd) })
+    }
+}
+
+pub(crate) trait FromOkCode {
+    fn from_ok_code(code: i32) -> Self;
+}
+
+impl FromOkCode for () {
+    fn from_ok_code(_: i32) -> Self {}
 }
 
 // ===== ErrCode =====
@@ -39,7 +94,7 @@ impl ErrCode {
     /// Returns raw error code from `errno`.
     #[inline]
     pub fn raw_errno() -> i32 {
-        unsafe { *__errno_location() }
+        unsafe { *libc::__errno_location() }
     }
 
     /// Returns the contained raw error code.
@@ -51,13 +106,13 @@ impl ErrCode {
     /// Returns `true` if error code is `EINTR`.
     #[inline]
     pub fn is_interrupt(self) -> bool {
-        matches!(self.code(), EINTR)
+        matches!(self.code(), libc::EINTR)
     }
 
     /// Returns `true` if error code is `EWOULDBLOCK` or `EAGAIN`.
     #[inline]
     pub fn would_block(self) -> bool {
-        matches!(self.code(), EWOULDBLOCK)
+        matches!(self.code(), libc::EWOULDBLOCK)
     }
 }
 
@@ -67,9 +122,9 @@ impl error::Error for ErrCode { }
 
 impl fmt::Display for ErrCode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let code = self.code();
+        let code = Self::code(*self);
         let mut buf = [0u8; 128];
-        let res = unsafe { strerror_r(code, buf.as_mut_ptr().cast(), buf.len()) };
+        let res = unsafe { libc::strerror_r(code, buf.as_mut_ptr().cast(), buf.len()) };
         write!(
             f,
             "{} (os error {code})",
@@ -84,18 +139,33 @@ impl fmt::Display for ErrCode {
     }
 }
 
-// ===== extern =====
+// ===== macros =====
 
-// error.h
-const EINTR: i32 = 4;
-const EAGAIN: i32 = 11;
-const EWOULDBLOCK: i32 = EAGAIN;
-
-unsafe extern "C" {
-    fn __errno_location() -> *mut i32;
-    #[cfg_attr(
-        not(any(target_env = "musl", target_env = "ohos")),
-        link_name = "__xpg_strerror_r"
-    )]
-    fn strerror_r(code: i32, buf: *mut c_char, len: usize) -> i32;
+/// implements `FromErrCode`, `Display`, `Debug`, `Error`, `{From,Into}<ErrCode>`.
+macro_rules! os_error_simple {
+    ($me:ident, $c:expr) => { const _: () = {
+        use core::fmt;
+        use crate::error::{ErrCode, FromErrCode};
+        impl FromErrCode for $me {
+            #[inline] fn from_err_code(code: ErrCode) -> Self { Self(code) }
+        }
+        impl fmt::Display for $me {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                write!(f, "failed to {}: {}", $c, self.0)
+            }
+        }
+        impl fmt::Debug for $me {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.debug_tuple(stringify!($me)).field(&self.0).finish()
+            }
+        }
+        impl core::error::Error for $me { }
+        impl From<ErrCode> for $me {
+            #[inline] fn from(v: ErrCode) -> Self { Self(v) }
+        }
+        impl From<$me> for ErrCode {
+            #[inline] fn from(v: $me) -> Self { v.0 }
+        }
+    };};
 }
+pub(crate) use os_error_simple;

@@ -1,6 +1,9 @@
 //! Linux Feature Bindings.
-#![warn(missing_docs, clippy::allow_attributes_without_reason)]
+#![warn(missing_docs)]
 #![allow(clippy::module_inception, clippy::new_without_default)]
 
+pub mod flags;
 pub mod fd;
 pub mod error;
+
+pub mod net;
