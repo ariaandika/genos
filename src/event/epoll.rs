@@ -1,8 +1,9 @@
 //! Linux epoll interface.
 use core::mem::MaybeUninit;
+use core::{error, fmt, result};
 
-use crate::error::{ErrCode, FromErrCode, os_error_simple};
-use crate::fd::{AsFd, AsRawFd, OwnedFd, impl_fd_simple};
+use crate::error::ErrCode;
+use crate::fd::{AsFd, AsRawFd, FromRawFd, OwnedFd, impl_fd_simple};
 use crate::flags::impl_bitops_simple;
 use crate::net::OpenFlag;
 
@@ -17,40 +18,40 @@ impl_fd_simple!(Epoll);
 impl Epoll {
     /// Creates new [`Epoll`].
     #[inline]
-    pub fn create(flags: Flags) -> Result<Self, CreateError> {
-        unsafe { <_>::fd(libc::epoll_create1(flags.0)) }
+    pub fn create(flags: Flags) -> Result<Self> {
+        unsafe { fd(libc::epoll_create1(flags.0), Kind::Create) }
     }
 
     /// Add an entry to the interest list.
     ///
     /// [`InputFlags`] can be added by `OR`-ing with [`EventType`].
     #[inline]
-    pub fn add<Fd: AsFd>(&self, fd: &Fd, events: EventType, data: u64) -> Result<(), CtlError> {
+    pub fn add<Fd: AsFd>(&self, fd: &Fd, events: EventType, data: u64) -> Result<()> {
         const OP: i32 = libc::EPOLL_CTL_ADD;
         let mut event = Event { events, data };
         let event = &raw mut event as _;
         let fd = fd.as_fd().as_raw_fd();
-        unsafe { <_>::e(libc::epoll_ctl(self.as_raw_fd(), OP, fd, event)) }
+        unsafe { e(libc::epoll_ctl(self.as_raw_fd(), OP, fd, event), Kind::Add) }
     }
 
     /// Change the settings associated with fd in the interest list.
     ///
     /// [`InputFlags`] can be added by `OR`-ing with [`EventType`].
     #[inline]
-    pub fn modify<Fd: AsFd>(&self, fd: &Fd, events: EventType, data: u64) -> Result<(), CtlError> {
+    pub fn modify<Fd: AsFd>(&self, fd: &Fd, events: EventType, data: u64) -> Result<()> {
         const OP: i32 = libc::EPOLL_CTL_MOD;
         let mut event = Event { events, data };
         let event = &raw mut event as _;
         let fd = fd.as_fd().as_raw_fd();
-        unsafe { <_>::e(libc::epoll_ctl(self.as_raw_fd(), OP, fd, event)) }
+        unsafe { e(libc::epoll_ctl(self.as_raw_fd(), OP, fd, event), Kind::Mod) }
     }
 
     /// Remove (deregister) the target fd from the interest list.
     #[inline]
-    pub fn delete<Fd: AsFd>(&self, fd: &Fd) -> Result<(), CtlError> {
+    pub fn delete<Fd: AsFd>(&self, fd: &Fd) -> Result<()> {
         const OP: i32 = libc::EPOLL_CTL_DEL;
         let fd = fd.as_fd().as_raw_fd();
-        unsafe { <_>::e(libc::epoll_ctl(self.as_raw_fd(), OP, fd, 0 as _)) }
+        unsafe { e(libc::epoll_ctl(self.as_raw_fd(), OP, fd, 0 as _), Kind::Del) }
     }
 }
 
@@ -77,7 +78,7 @@ impl Epoll {
     /// The `events` field is a bit mask of [`EventType`] that indicates the events that have
     /// occurred for the corresponding open file description.
     #[inline]
-    pub fn wait(&self, buf: &mut [MaybeUninit<Event>], timeout: i32) -> Result<usize, WaitError> {
+    pub fn wait(&self, buf: &mut [MaybeUninit<Event>], timeout: i32) -> Result<usize> {
         let ptr = buf.as_mut_ptr().cast();
         let res = unsafe { libc::epoll_wait(self.as_raw_fd(), ptr, buf.len() as _, timeout) };
         match res.try_into() {
@@ -87,7 +88,7 @@ impl Epoll {
                 if code.is_interrupt() {
                     Ok(0)
                 } else {
-                    Err(<_>::from_err_code(code))
+                    Err(Error::errno(Kind::Wait))
                 }
             }
         }
@@ -244,20 +245,67 @@ impl InputFlags {
 
 // ===== errors =====
 
-/// An error that may occur when creating epoll.
-#[derive(Clone, Copy)]
-pub struct CreateError(ErrCode);
+fn fd<T: FromRawFd>(res: i32, kind: Kind) -> Result<T> {
+    if res == -1 {
+        return Err(Error::errno(kind));
+    }
+    Ok(unsafe { T::from_raw_fd(res) })
+}
 
-os_error_simple!(CreateError, "create epoll");
+fn e(res: i32, kind: Kind) -> Result<()> {
+    if res == -1 {
+        return Err(Error::errno(kind));
+    }
+    Ok(())
+}
 
-/// An error that may occur when configuring fd on the epoll.
-#[derive(Clone, Copy)]
-pub struct CtlError(ErrCode);
+/// Type alias for result of [`Epoll`] operations.
+pub type Result<T> = result::Result<T, Error>;
 
-os_error_simple!(CtlError, "configure fd on the epoll");
+/// An error that may occur during any [`Epoll`] operations.
+#[derive(Debug, Clone)]
+pub struct Error {
+    kind: Kind,
+    code: ErrCode,
+}
 
-/// An error that may occur when waiting for fd notification on the epoll.
-#[derive(Clone, Copy)]
-pub struct WaitError(ErrCode);
+#[derive(Debug, Clone)]
+enum Kind {
+    Create,
+    Add,
+    Mod,
+    Del,
+    Wait,
+}
 
-os_error_simple!(WaitError, "wait for notification on epoll");
+impl Error {
+    fn errno(kind: Kind) -> Self {
+        Self {
+            kind,
+            code: ErrCode::errno(),
+        }
+    }
+}
+
+impl From<Error> for ErrCode {
+    #[inline]
+    fn from(value: Error) -> Self {
+        value.code
+    }
+}
+
+impl error::Error for Error {}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { kind, code } = self;
+        let msg = match kind {
+            Kind::Create => "create epoll",
+            Kind::Add => "add fd to the epoll",
+            Kind::Mod => "modify fd on the epoll",
+            Kind::Del => "delete fd on the epoll",
+            Kind::Wait => "wait for notification on the epoll",
+        };
+        write!(f, "failed to {msg}: {code}")
+    }
+}
