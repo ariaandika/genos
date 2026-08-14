@@ -18,20 +18,26 @@ macro_rules! impl_bitops_simple {
         crate::flags::impl_bitops_simple!($me, Self);
     };
     ($me:ident, $rhs:ident) => {
-        impl std::ops::BitOr<$rhs> for Flags {
+        impl std::ops::BitOr<$rhs> for $me {
             type Output = Self;
             #[inline]
-            fn bitor(self, rhs: Self) -> Self::Output { Self(self.0.bitor(rhs.0)) }
+            fn bitor(self, rhs: $rhs) -> Self::Output {
+                Self(self.0.bitor(rhs.0))
+            }
         }
-        impl std::ops::BitAnd for Flags {
+        impl std::ops::BitAnd<$rhs> for $me {
             type Output = Self;
             #[inline]
-            fn bitand(self, rhs: Self) -> Self::Output { Self(self.0.bitand(rhs.0)) }
+            fn bitand(self, rhs: $rhs) -> Self::Output {
+                Self(self.0.bitand(rhs.0))
+            }
         }
-        impl std::ops::BitXor for Flags {
+        impl std::ops::BitXor<$rhs> for $me {
             type Output = Self;
             #[inline]
-            fn bitxor(self, rhs: Self) -> Self::Output { Self(self.0.bitxor(rhs.0)) }
+            fn bitxor(self, rhs: $rhs) -> Self::Output {
+                Self(self.0.bitxor(rhs.0))
+            }
         }
     };
 }
