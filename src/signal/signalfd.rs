@@ -1,9 +1,10 @@
 //! [`Signalfd`] associated types.
 use core::mem::MaybeUninit;
 use core::task::Poll;
+use core::{error, fmt, result};
 
-use crate::error::{ErrCode, FromErrCode, os_error_simple};
-use crate::fd::{AsRawFd, OwnedFd, impl_fd_simple};
+use crate::error::ErrCode;
+use crate::fd::{AsRawFd, FromRawFd, OwnedFd, impl_fd_simple};
 use crate::flags::impl_bitops_simple;
 use crate::net::OpenFlag;
 use crate::signal::{Signo, Sigset};
@@ -19,13 +20,13 @@ impl_fd_simple!(Signalfd);
 impl Signalfd {
     /// Create new [`Signalfd`].
     #[inline]
-    pub fn new(sigset: &Sigset) -> Result<Self, CreateError> {
-        unsafe { <_>::fd(libc::signalfd(-1, sigset.as_ref(), 0)) }
+    pub fn new(sigset: &Sigset) -> Result<Self> {
+        unsafe { fd(libc::signalfd(-1, sigset.as_ref(), 0), Kind::Create) }
     }
 
     /// Read for pending signal.
     #[inline]
-    pub fn read(&self) -> Result<Siginfo, CreateError> {
+    pub fn read(&self) -> Result<Siginfo> {
         const LEN: usize = size_of::<Siginfo>();
         let mut buf = MaybeUninit::<Siginfo>::uninit();
         let mut n = 0;
@@ -35,7 +36,7 @@ impl Signalfd {
                 libc::read(self.as_raw_fd(), ptr, rem)
             };
             let Ok(read) = usize::try_from(read) else {
-                return Err(<_>::errno());
+                return Err(Error::errno(Kind::Read));
             };
             n += read;
         }
@@ -44,8 +45,8 @@ impl Signalfd {
 
     /// Poll read for pending signal.
     #[inline]
-    pub fn poll_read(&self) -> Poll<Result<Siginfo, CreateError>> {
-        <_>::ep(Self::read(self))
+    pub fn poll_read(&self) -> Poll<Result<Siginfo>> {
+        ep(Self::read(self))
     }
 }
 
@@ -86,10 +87,62 @@ impl OpenFlag for Flags {
 
 impl_bitops_simple!(Flags);
 
-// ===== errors =====
+// ===== Error =====
 
-/// An error that may occur when creating signalfd.
-#[derive(Clone, Copy)]
-pub struct CreateError(ErrCode);
+fn fd<T: FromRawFd>(res: i32, kind: Kind) -> Result<T> {
+    if res == -1 {
+        return Err(Error::errno(kind));
+    }
+    Ok(unsafe { T::from_raw_fd(res) })
+}
 
-os_error_simple!(CreateError, "create signalfd");
+fn ep<T>(res: Result<T>) -> Poll<Result<T>> {
+    match res {
+        Ok(ok) => Poll::Ready(Ok(ok)),
+        Err(err) => {
+            if err.code.would_block() {
+                Poll::Pending
+            } else {
+                Poll::Ready(Err(err))
+            }
+        }
+    }
+}
+
+/// Type alias for result of [`Signalfd`] operations.
+pub type Result<T, E = Error> = result::Result<T, E>;
+
+/// An error that may occur during any [`Signalfd`] operations.
+#[derive(Debug, Clone)]
+pub struct Error {
+    kind: Kind,
+    code: ErrCode,
+}
+
+impl Error {
+    fn errno(kind: Kind) -> Error {
+        Self {
+            kind,
+            code: ErrCode::errno(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+enum Kind {
+    Create,
+    Read,
+}
+
+impl error::Error for Error {}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { kind, code } = self;
+        let msg = match kind {
+            Kind::Create => "create signalfd",
+            Kind::Read => "read signalfd pending signal",
+        };
+        write!(f, "failed to {msg}: {code}")
+    }
+}

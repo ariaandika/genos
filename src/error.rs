@@ -1,10 +1,7 @@
 //! Error types.
 use core::ffi::CStr;
 use core::num::NonZeroU8;
-use core::task::Poll;
 use core::{error, fmt};
-
-use crate::fd::FromRawFd;
 
 // ===== traits =====
 
@@ -26,32 +23,6 @@ pub(crate) trait FromErrCode: Sized {
             return Err(Self::errno());
         }
         Ok(T::from_ok_code(res))
-    }
-
-    #[inline]
-    fn ep<T>(res: Result<T, Self>) -> Poll<Result<T, Self>>
-    where
-        Self: Into<ErrCode>,
-    {
-        match res {
-            Ok(ok) => Poll::Ready(Ok(ok)),
-            Err(err) => {
-                let code = err.into();
-                if code.would_block() {
-                    Poll::Pending
-                } else {
-                    Poll::Ready(Err(Self::from_err_code(code)))
-                }
-            }
-        }
-    }
-
-    #[inline]
-    unsafe fn fd<T: FromRawFd>(fd: i32) -> Result<T, Self> {
-        if fd == -1 {
-            return Err(Self::errno());
-        }
-        Ok(unsafe { T::from_raw_fd(fd) })
     }
 }
 
@@ -109,7 +80,7 @@ impl ErrCode {
 
 // ===== core traits =====
 
-impl error::Error for ErrCode { }
+impl error::Error for ErrCode {}
 
 impl fmt::Display for ErrCode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -134,29 +105,40 @@ impl fmt::Display for ErrCode {
 
 /// implements `FromErrCode`, `Display`, `Debug`, `Error`, `{From,Into}<ErrCode>`.
 macro_rules! os_error_simple {
-    ($me:ident, $c:expr) => { const _: () = {
-        use core::fmt;
-        use crate::error::{ErrCode, FromErrCode};
-        impl FromErrCode for $me {
-            #[inline] fn from_err_code(code: ErrCode) -> Self { Self(code) }
-        }
-        impl fmt::Display for $me {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                write!(f, "failed to {}: {}", $c, self.0)
+    ($me:ident, $c:expr) => {
+        const _: () = {
+            use crate::error::{ErrCode, FromErrCode};
+            use core::fmt;
+            impl FromErrCode for $me {
+                #[inline]
+                fn from_err_code(code: ErrCode) -> Self {
+                    Self(code)
+                }
             }
-        }
-        impl fmt::Debug for $me {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                f.debug_tuple(stringify!($me)).field(&self.0).finish()
+            impl fmt::Display for $me {
+                fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                    write!(f, "failed to {}: {}", $c, self.0)
+                }
             }
-        }
-        impl core::error::Error for $me { }
-        impl From<ErrCode> for $me {
-            #[inline] fn from(v: ErrCode) -> Self { Self(v) }
-        }
-        impl From<$me> for ErrCode {
-            #[inline] fn from(v: $me) -> Self { v.0 }
-        }
-    };};
+            impl fmt::Debug for $me {
+                fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                    f.debug_tuple(stringify!($me)).field(&self.0).finish()
+                }
+            }
+            impl core::error::Error for $me {}
+            impl From<ErrCode> for $me {
+                #[inline]
+                fn from(v: ErrCode) -> Self {
+                    Self(v)
+                }
+            }
+            impl From<$me> for ErrCode {
+                #[inline]
+                fn from(v: $me) -> Self {
+                    v.0
+                }
+            }
+        };
+    };
 }
 pub(crate) use os_error_simple;

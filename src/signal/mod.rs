@@ -10,5 +10,4 @@ pub mod signalfd;
 /// Signal operation error types.
 pub mod error {
     pub use super::sigset::ProcSignalError;
-    pub use super::signalfd::CreateError;
 }
