@@ -1,10 +1,10 @@
 //! Linux socket.
 use core::ffi::{CStr, c_char};
-use core::{error, fmt, mem};
-use std::task::Poll;
+use core::task::Poll;
+use core::{error, fmt, mem, result};
 
-use crate::error::{ErrCode, FromErrCode, os_error_simple};
-use crate::fd::{AsRawFd, OwnedFd, impl_fd_simple};
+use crate::error::ErrCode;
+use crate::fd::{AsRawFd, FromRawFd, OwnedFd, impl_fd_simple};
 use crate::flags::{OpenFlag, impl_bitops_simple};
 
 // ===== Socket =====
@@ -18,56 +18,60 @@ impl_fd_simple!(Socket);
 impl Socket {
     /// Creates new [`Socket`].
     #[inline]
-    pub fn create(domain: Domain, ty: Type, flags: Flags) -> Result<Self, CreateError> {
-        unsafe { <_>::fd(libc::socket(domain.0, ty.0 | flags.0, 0)) }
+    pub fn create(domain: Domain, ty: Type, flags: Flags) -> Result<Self> {
+        unsafe { fd(libc::socket(domain.0, ty.0 | flags.0, 0), Kind::Create) }
     }
 
     /// Creates new UNIX domain [`Socket`] stream.
     #[inline]
-    pub fn unix_stream(flags: Flags) -> Result<Self, CreateError> {
+    pub fn unix_stream(flags: Flags) -> Result<Self> {
         Self::create(Domain::UNIX, Type::STREAM, flags)
     }
 
     /// Bind address to this socket.
     #[inline]
-    pub fn bind<A: SockAddr>(&self, addr: &A) -> Result<(), BindError> {
+    pub fn bind<A: SockAddr>(&self, addr: &A) -> Result<()> {
         let (raw, len) = addr.as_raw();
-        <_>::e(unsafe { libc::bind(self.as_raw_fd(), raw as *const _ as _, len) })
+        let ptr = raw as *const _ as _;
+        unsafe { e(libc::bind(self.as_raw_fd(), ptr, len), Kind::Bind) }
     }
 
     /// Initiate a connection on this socket.
     #[inline]
-    pub fn connect<A: SockAddr>(&self, addr: &A) -> Result<(), ConnectError> {
+    pub fn connect<A: SockAddr>(&self, addr: &A) -> Result<()> {
         let (raw, len) = addr.as_raw();
-        <_>::e(unsafe { libc::connect(self.as_raw_fd(), raw as *const _ as _, len) })
+        let ptr = raw as *const _ as _;
+        unsafe { e(libc::connect(self.as_raw_fd(), ptr, len), Kind::Connect) }
     }
 
     /// Returns this socket address.
     #[inline]
-    pub fn addr<A: SockAddr>(&self) -> Result<A, AddrError> {
+    pub fn addr<A: SockAddr>(&self) -> Result<A> {
         let mut addr = unsafe { mem::zeroed::<A::Raw>() };
         let mut len = size_of::<A::Raw>() as _;
-        match <_>::e(unsafe { libc::getsockname(self.as_raw_fd(), &raw mut addr as _, &mut len) }) {
-            Ok(()) => A::from_raw(addr, len),
+        let res = unsafe { libc::getsockname(self.as_raw_fd(), &raw mut addr as _, &mut len) };
+        match e(res, Kind::GetAddr) {
+            Ok(()) => A::from_raw(addr, len).map_err(<_>::into),
             Err(err) => Err(err),
         }
     }
 
     /// Returns the peer socket address.
     #[inline]
-    pub fn peer_addr<A: SockAddr>(&self) -> Result<A, AddrError> {
+    pub fn peer_addr<A: SockAddr>(&self) -> Result<A> {
         let mut addr = unsafe { mem::zeroed::<A::Raw>() };
         let mut len = size_of::<A::Raw>() as _;
-        let _: () = AddrError::e(unsafe {
-            libc::getpeername(self.as_raw_fd(), &raw mut addr as _, &mut len)
-        })?;
-        A::from_raw(addr, len)
+        let res = unsafe { libc::getpeername(self.as_raw_fd(), &raw mut addr as _, &mut len) };
+        match e(res, Kind::GetAddr) {
+            Ok(()) => A::from_raw(addr, len).map_err(<_>::into),
+            Err(err) => Err(err),
+        }
     }
 
     /// Listen for connections on this socket.
     #[inline]
-    pub fn listen(&self) -> Result<(), ListenError> {
-        <_>::e(unsafe { libc::listen(self.as_raw_fd(), -1) })
+    pub fn listen(&self) -> Result<()> {
+        unsafe { e(libc::listen(self.as_raw_fd(), -1), Kind::Listen) }
     }
 }
 
@@ -75,52 +79,53 @@ impl Socket {
 impl Socket {
     /// Read from this socket.
     #[inline]
-    pub fn read(&self, buf: &mut [u8]) -> Result<usize, ReadError> {
+    pub fn read(&self, buf: &mut [u8]) -> Result<usize> {
         let ptr = buf.as_mut_ptr().cast();
-        unsafe { <_>::io(libc::read(self.as_raw_fd(), ptr, buf.len())) }
+        unsafe { io(libc::read(self.as_raw_fd(), ptr, buf.len()), Kind::Read) }
     }
 
     /// Write to this socket.
     #[inline]
-    pub fn write(&self, buf: &[u8]) -> Result<usize, WriteError> {
+    pub fn write(&self, buf: &[u8]) -> Result<usize> {
         let ptr = buf.as_ptr().cast();
-        unsafe { <_>::io(libc::write(self.as_raw_fd(), ptr, buf.len())) }
-    }
-
-    /// Poll read from this socket.
-    #[inline]
-    pub fn poll_read(&self, buf: &mut [u8]) -> Poll<Result<usize, ReadError>> {
-        <_>::ep(Self::read(self, buf))
-    }
-
-    /// Poll write to this socket.
-    #[inline]
-    pub fn poll_write(&self, buf: &[u8]) -> Poll<Result<usize, WriteError>> {
-        <_>::ep(Self::write(self, buf))
+        unsafe { io(libc::write(self.as_raw_fd(), ptr, buf.len()), Kind::Write) }
     }
 
     /// Accept a connection on this socket.
     #[inline]
-    pub fn accept(&self) -> Result<Self, AcceptError> {
-        unsafe { <_>::fd(libc::accept(self.as_raw_fd(), 0 as _, 0 as _)) }
+    pub fn accept(&self) -> Result<Self> {
+        unsafe { fd(libc::accept(self.as_raw_fd(), 0 as _, 0 as _), Kind::Accept) }
     }
 
     /// Accept a connection on this socket and apply given flags.
     #[inline]
-    pub fn accept4(&self, flags: Flags) -> Result<Self, AcceptError> {
-        unsafe { <_>::fd(libc::accept4(self.as_raw_fd(), 0 as _, 0 as _, flags.0)) }
+    pub fn accept4(&self, flags: Flags) -> Result<Self> {
+        let me = self.as_raw_fd();
+        unsafe { fd(libc::accept4(me, 0 as _, 0 as _, flags.0), Kind::Accept) }
+    }
+
+    /// Poll read from this socket.
+    #[inline]
+    pub fn poll_read(&self, buf: &mut [u8]) -> Poll<Result<usize>> {
+        ep(Self::read(self, buf))
+    }
+
+    /// Poll write to this socket.
+    #[inline]
+    pub fn poll_write(&self, buf: &[u8]) -> Poll<Result<usize>> {
+        ep(Self::write(self, buf))
     }
 
     /// Poll accept a connection on this socket.
     #[inline]
-    pub fn poll_accept(&self) -> Poll<Result<Self, AcceptError>> {
-        <_>::ep(Self::accept(self))
+    pub fn poll_accept(&self) -> Poll<Result<Self>> {
+        ep(Self::accept(self))
     }
 
     /// Poll accept a connection on this socket and apply given flags.
     #[inline]
-    pub fn poll_accept4(&self, flags: Flags) -> Poll<Result<Self, AcceptError>> {
-        <_>::ep(Self::accept4(self, flags))
+    pub fn poll_accept4(&self, flags: Flags) -> Poll<Result<Self>> {
+        ep(Self::accept4(self, flags))
     }
 }
 
@@ -150,12 +155,12 @@ pub struct SockaddrUn {
 impl SockaddrUn {
     /// Creates [`SockaddrUn`] with given path.
     #[inline]
-    pub const fn from_path(path: &CStr) -> Result<Self, AddrTooLong> {
+    pub const fn from_path(path: &CStr) -> Result<Self, AddrError> {
         let mut addr = unsafe { mem::zeroed::<libc::sockaddr_un>() };
         addr.sun_family = libc::AF_UNIX as _;
         let path = path.to_bytes_with_nul();
         if path.len() > addr.sun_path.len() {
-            return Err(AddrTooLong);
+            return Err(AddrError::ExcessivePath);
         }
         unsafe {
             addr.sun_path
@@ -201,7 +206,7 @@ impl sealed::Sealed for SockaddrUn {
         if len == 0 {
             len = SUN_PATH_OFFSET as _;
         } else if addr.sun_family != libc::AF_UNIX as _ {
-            return Err(ErrCode::new(libc::EINVAL).into());
+            return Err(AddrError::MissmatchDomain);
         }
         Ok(Self { addr, len })
     }
@@ -269,115 +274,127 @@ impl OpenFlag for Flags {
 
 impl_bitops_simple!(Flags);
 
-// ===== AddTooLong =====
+// ===== Error =====
 
-/// An error that occur when supplying socket address that is too long.
-#[derive(Debug, Clone, Copy)]
-pub struct AddrTooLong;
+fn fd<T: FromRawFd>(res: i32, kind: Kind) -> Result<T> {
+    if res == -1 {
+        return Err(Error::errno(kind));
+    }
+    Ok(unsafe { T::from_raw_fd(res) })
+}
 
-impl error::Error for AddrTooLong { }
+fn e(res: i32, kind: Kind) -> Result<()> {
+    if res == -1 {
+        return Err(Error::errno(kind));
+    }
+    Ok(())
+}
 
-impl fmt::Display for AddrTooLong {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "socket address path is too long")
+fn io(res: isize, kind: Kind) -> Result<usize> {
+    match usize::try_from(res) {
+        Ok(ok) => Ok(ok),
+        Err(_) => Err(Error::errno(kind)),
     }
 }
 
-// ===== CreateError =====
-
-/// An error that may occur when creating socket.
-#[derive(Clone, Copy)]
-pub struct CreateError(ErrCode);
-
-os_error_simple!(CreateError, "create socket");
-
-// ===== ListenError =====
-
-/// An error that may occur when listening on socket.
-#[derive(Clone, Copy)]
-pub struct ListenError(ErrCode);
-
-os_error_simple!(ListenError, "listen for connections on a socket");
-
-// ===== AddrError =====
-
-/// An error that may occur when querying address on a socket.
-#[derive(Clone, Copy)]
-pub struct AddrError(ErrCode);
-
-os_error_simple!(AddrError, "get an address on a socket");
-
-// ===== AcceptError =====
-
-/// An error that may occur when accepting connection on a socket.
-#[derive(Clone, Copy)]
-pub struct AcceptError(ErrCode);
-
-os_error_simple!(AcceptError, "accept connection on a socket");
-
-// ===== ReadError =====
-
-/// An error that may occur when reading from a socket.
-#[derive(Clone, Copy)]
-pub struct ReadError(ErrCode);
-
-os_error_simple!(ReadError, "read from a socket");
-
-// ===== WriteError =====
-
-/// An error that may occur when writing to a socket.
-#[derive(Clone, Copy)]
-pub struct WriteError(ErrCode);
-
-os_error_simple!(WriteError, "write to a socket");
-
-// ===== ConnectError =====
-
-/// An error that can occur during socket connecting.
-#[derive(Debug)]
-pub enum ConnectError {
-    /// Address creating failed.
-    Addr(AddrTooLong),
-    /// Connect call failed.
-    Connect(ErrCode),
-}
-
-// ===== BindError =====
-
-/// An error that can occur during socket name binding.
-#[derive(Debug)]
-pub enum BindError {
-    /// Address creating failed.
-    Addr(AddrTooLong),
-    /// Bind call failed.
-    Bind(ErrCode),
-}
-
-macro_rules! error_with_bind {
-    ($me:ident::$vr:ident, $cx:literal) => {
-        impl error::Error for $me {}
-        impl fmt::Display for $me {
-            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-                match self {
-                    Self::Addr(err) => err.fmt(f),
-                    Self::$vr(err) => write!(f, "failed to {}: {}", $cx, err),
-                }
+fn ep<T>(res: Result<T>) -> Poll<Result<T>> {
+    match res {
+        Ok(ok) => Poll::Ready(Ok(ok)),
+        Err(err) => {
+            if err.code.would_block() {
+                Poll::Pending
+            } else {
+                Poll::Ready(Err(err))
             }
         }
-        impl From<ErrCode> for $me {
-            #[inline]
-            fn from(v: ErrCode) -> Self { Self::$vr(v) }
-        }
-        impl From<AddrTooLong> for $me {
-            #[inline]
-            fn from(v: AddrTooLong) -> Self { Self::Addr(v) }
-        }
-        impl FromErrCode for $me {
-            fn from_err_code(code: ErrCode) -> Self {
-                Self::$vr(code)
-            }
-        }
-    };
+    }
 }
-error_with_bind!(ConnectError::Connect, "initiate connection on a socket");
-error_with_bind!(BindError::Bind, "bind address to socket");
+
+/// Type alias for result of [`Socket`] operations.
+pub type Result<T, E = Error> = result::Result<T, E>;
+
+/// An error that may occur during any [`Socket`] operations.
+#[derive(Debug, Clone)]
+pub struct Error {
+    kind: Kind,
+    code: ErrCode,
+}
+
+#[derive(Debug, Clone)]
+enum Kind {
+    Create,
+    Bind,
+    Connect,
+    Listen,
+    Read,
+    Write,
+    Accept,
+    GetAddr,
+    Addr(AddrError),
+}
+
+impl Error {
+    fn errno(kind: Kind) -> Self {
+        Self {
+            kind,
+            code: ErrCode::errno(),
+        }
+    }
+}
+
+impl From<AddrError> for Error {
+    #[inline]
+    fn from(v: AddrError) -> Self {
+        Self {
+            kind: Kind::Addr(v),
+            code: ErrCode::new(libc::EINVAL),
+        }
+    }
+}
+
+impl error::Error for Error {}
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { kind, code } = self;
+        let cause = match kind {
+            Kind::Addr(err) => format_args!("{}", { err }),
+            _ => format_args!("{code}"),
+        };
+        let msg = match kind {
+            Kind::Create => "create socket",
+            Kind::Bind => "bind socket address",
+            Kind::Connect => "connect peer socket",
+            Kind::Listen => "listen socket connection",
+            Kind::Read => "read socket",
+            Kind::Write => "write socket",
+            Kind::Accept => "accept socket connection",
+            Kind::GetAddr => "get socket address",
+            Kind::Addr(_) => "create socket address",
+        };
+        write!(f, "failed to {msg}: {cause}")
+    }
+}
+
+// ===== SockAddrError =====
+
+/// An error that occur when validating socket address.
+#[derive(Debug, Clone, Copy)]
+pub enum AddrError {
+    /// Address path length exceeds maximum capacity.
+    ExcessivePath,
+    /// Domain in generic socket address does not match.
+    MissmatchDomain,
+}
+
+impl error::Error for AddrError {}
+
+impl fmt::Display for AddrError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let msg = match self {
+            Self::ExcessivePath => "excessive path length",
+            Self::MissmatchDomain => "missmatch domain name",
+        };
+        msg.fmt(f)
+    }
+}

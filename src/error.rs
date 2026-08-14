@@ -1,8 +1,8 @@
 //! Error types.
 use core::ffi::CStr;
 use core::num::NonZeroU8;
+use core::task::Poll;
 use core::{error, fmt};
-use std::task::Poll;
 
 use crate::fd::FromRawFd;
 
@@ -26,15 +26,6 @@ pub(crate) trait FromErrCode: Sized {
             return Err(Self::errno());
         }
         Ok(T::from_ok_code(res))
-    }
-
-    /// Returns `Err` if `res` is negative.
-    #[inline]
-    fn io(res: isize) -> Result<usize, Self> {
-        match usize::try_from(res) {
-            Ok(ok) => Ok(ok),
-            Err(_) => Err(Self::errno()),
-        }
     }
 
     #[inline]
