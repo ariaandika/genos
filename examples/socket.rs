@@ -1,6 +1,5 @@
-use std::env;
 use std::ffi::CString;
-use std::fmt;
+use std::{env, fmt};
 
 use genos::net::{OpenFlag, SockaddrUn, Socket};
 

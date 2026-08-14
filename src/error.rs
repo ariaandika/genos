@@ -87,17 +87,14 @@ impl fmt::Display for ErrCode {
         let code = Self::code(*self);
         let mut buf = [0u8; 128];
         let res = unsafe { libc::strerror_r(code, buf.as_mut_ptr().cast(), buf.len()) };
-        write!(
-            f,
-            "{} (os error {code})",
-            if res >= 0 {
-                CStr::from_bytes_until_nul(&buf[..])
-                    .unwrap_or(c"unknown")
-                    .to_string_lossy()
-            } else {
-                "unknown".into()
-            }
-        )
+        let msg = if res >= 0 {
+            CStr::from_bytes_until_nul(&buf[..])
+                .unwrap_or(c"unknown")
+                .to_string_lossy()
+        } else {
+            "unknown".into()
+        };
+        write!(f, "{msg} (os error {code})",)
     }
 }
 
@@ -107,8 +104,8 @@ impl fmt::Display for ErrCode {
 macro_rules! os_error_simple {
     ($me:ident, $c:expr) => {
         const _: () = {
-            use crate::error::{ErrCode, FromErrCode};
             use core::fmt;
+            use crate::error::{ErrCode, FromErrCode};
             impl FromErrCode for $me {
                 #[inline]
                 fn from_err_code(code: ErrCode) -> Self {

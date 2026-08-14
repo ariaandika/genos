@@ -29,9 +29,8 @@ impl Epoll {
     pub fn add<Fd: AsFd>(&self, fd: &Fd, events: EventType, data: u64) -> Result<()> {
         const OP: i32 = libc::EPOLL_CTL_ADD;
         let mut event = Event { events, data };
-        let event = &raw mut event as _;
         let fd = fd.as_fd().as_raw_fd();
-        unsafe { e(libc::epoll_ctl(self.as_raw_fd(), OP, fd, event), Kind::Add) }
+        unsafe { e(libc::epoll_ctl(self.as_raw_fd(), OP, fd, &raw mut event as _), Kind::Add) }
     }
 
     /// Change the settings associated with fd in the interest list.
@@ -41,9 +40,8 @@ impl Epoll {
     pub fn modify<Fd: AsFd>(&self, fd: &Fd, events: EventType, data: u64) -> Result<()> {
         const OP: i32 = libc::EPOLL_CTL_MOD;
         let mut event = Event { events, data };
-        let event = &raw mut event as _;
         let fd = fd.as_fd().as_raw_fd();
-        unsafe { e(libc::epoll_ctl(self.as_raw_fd(), OP, fd, event), Kind::Mod) }
+        unsafe { e(libc::epoll_ctl(self.as_raw_fd(), OP, fd, &raw mut event as _), Kind::Mod) }
     }
 
     /// Remove (deregister) the target fd from the interest list.
@@ -84,8 +82,7 @@ impl Epoll {
         match res.try_into() {
             Ok(len) => Ok(len),
             Err(_) => {
-                let code = ErrCode::errno();
-                if code.is_interrupt() {
+                if ErrCode::errno().is_interrupt() {
                     Ok(0)
                 } else {
                     Err(Error::errno(Kind::Wait))
@@ -280,10 +277,7 @@ enum Kind {
 
 impl Error {
     fn errno(kind: Kind) -> Self {
-        Self {
-            kind,
-            code: ErrCode::errno(),
-        }
+        Self { kind, code: ErrCode::errno() }
     }
 }
 

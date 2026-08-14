@@ -121,10 +121,7 @@ pub struct Error {
 
 impl Error {
     fn errno(kind: Kind) -> Error {
-        Self {
-            kind,
-            code: ErrCode::errno(),
-        }
+        Self { kind, code: ErrCode::errno() }
     }
 }
 

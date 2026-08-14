@@ -1,6 +1,6 @@
 //! Networking primitives.
-pub use crate::flags::OpenFlag;
+pub use socket::{SockaddrUn, Socket};
 
-pub use socket::{Socket, SockaddrUn};
+pub use crate::flags::OpenFlag;
 
 pub mod socket;

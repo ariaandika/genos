@@ -32,16 +32,14 @@ impl Socket {
     #[inline]
     pub fn bind<A: SockAddr>(&self, addr: &A) -> Result<()> {
         let (raw, len) = addr.as_raw();
-        let ptr = raw as *const _ as _;
-        unsafe { e(libc::bind(self.as_raw_fd(), ptr, len), Kind::Bind) }
+        unsafe { e(libc::bind(self.as_raw_fd(), raw as *const _ as _, len), Kind::Bind) }
     }
 
     /// Initiate a connection on this socket.
     #[inline]
     pub fn connect<A: SockAddr>(&self, addr: &A) -> Result<()> {
         let (raw, len) = addr.as_raw();
-        let ptr = raw as *const _ as _;
-        unsafe { e(libc::connect(self.as_raw_fd(), ptr, len), Kind::Connect) }
+        unsafe { e(libc::connect(self.as_raw_fd(), raw as *const _ as _, len), Kind::Connect) }
     }
 
     /// Returns this socket address.
@@ -100,8 +98,7 @@ impl Socket {
     /// Accept a connection on this socket and apply given flags.
     #[inline]
     pub fn accept4(&self, flags: Flags) -> Result<Self> {
-        let me = self.as_raw_fd();
-        unsafe { fd(libc::accept4(me, 0 as _, 0 as _, flags.0), Kind::Accept) }
+        unsafe { fd(libc::accept4(self.as_raw_fd(), 0 as _, 0 as _, flags.0), Kind::Accept) }
     }
 
     /// Poll read from this socket.
@@ -335,20 +332,14 @@ enum Kind {
 
 impl Error {
     fn errno(kind: Kind) -> Self {
-        Self {
-            kind,
-            code: ErrCode::errno(),
-        }
+        Self { kind, code: ErrCode::errno() }
     }
 }
 
 impl From<AddrError> for Error {
     #[inline]
     fn from(v: AddrError) -> Self {
-        Self {
-            kind: Kind::Addr(v),
-            code: ErrCode::new(libc::EINVAL),
-        }
+        Self { kind: Kind::Addr(v), code: ErrCode::new(libc::EINVAL) }
     }
 }
 
