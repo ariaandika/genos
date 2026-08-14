@@ -34,6 +34,14 @@ impl FromOkCode for () {
     fn from_ok_code(_: i32) -> Self {}
 }
 
+// ===== AsErrCode =====
+
+/// An error that is associated with [`ErrCode`].
+pub trait AsErrCode {
+    /// Returns the contained [`ErrCode`].
+    fn as_err_code(&self) -> ErrCode;
+}
+
 // ===== ErrCode =====
 
 /// Error Code.
@@ -105,11 +113,17 @@ macro_rules! os_error_simple {
     ($me:ident, $c:expr) => {
         const _: () = {
             use core::fmt;
-            use crate::error::{ErrCode, FromErrCode};
+            use crate::error::{AsErrCode, ErrCode, FromErrCode};
             impl FromErrCode for $me {
                 #[inline]
                 fn from_err_code(code: ErrCode) -> Self {
                     Self(code)
+                }
+            }
+            impl AsErrCode for $me {
+                #[inline]
+                fn as_err_code(&self) -> ErrCode {
+                    self.0
                 }
             }
             impl fmt::Display for $me {

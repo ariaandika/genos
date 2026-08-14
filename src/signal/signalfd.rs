@@ -3,7 +3,7 @@ use core::mem::MaybeUninit;
 use core::task::Poll;
 use core::{error, fmt, result};
 
-use crate::error::ErrCode;
+use crate::error::{AsErrCode, ErrCode};
 use crate::fd::{AsRawFd, FromRawFd, OwnedFd, impl_fd_simple};
 use crate::flags::impl_bitops_simple;
 use crate::net::OpenFlag;
@@ -129,6 +129,13 @@ impl Error {
 enum Kind {
     Create,
     Read,
+}
+
+impl AsErrCode for Error {
+    #[inline]
+    fn as_err_code(&self) -> ErrCode {
+        self.code
+    }
 }
 
 impl error::Error for Error {}

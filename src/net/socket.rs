@@ -3,7 +3,7 @@ use core::ffi::{CStr, c_char};
 use core::task::Poll;
 use core::{error, fmt, mem, result};
 
-use crate::error::ErrCode;
+use crate::error::{AsErrCode, ErrCode};
 use crate::fd::{AsRawFd, FromRawFd, OwnedFd, impl_fd_simple};
 use crate::flags::{OpenFlag, impl_bitops_simple};
 
@@ -340,6 +340,13 @@ impl From<AddrError> for Error {
     #[inline]
     fn from(v: AddrError) -> Self {
         Self { kind: Kind::Addr(v), code: ErrCode::new(libc::EINVAL) }
+    }
+}
+
+impl AsErrCode for Error {
+    #[inline]
+    fn as_err_code(&self) -> ErrCode {
+        self.code
     }
 }
 

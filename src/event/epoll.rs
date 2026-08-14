@@ -2,7 +2,7 @@
 use core::mem::MaybeUninit;
 use core::{error, fmt, result};
 
-use crate::error::ErrCode;
+use crate::error::{AsErrCode, ErrCode};
 use crate::fd::{AsFd, AsRawFd, FromRawFd, OwnedFd, impl_fd_simple};
 use crate::flags::impl_bitops_simple;
 use crate::net::OpenFlag;
@@ -285,6 +285,13 @@ impl From<Error> for ErrCode {
     #[inline]
     fn from(value: Error) -> Self {
         value.code
+    }
+}
+
+impl AsErrCode for Error {
+    #[inline]
+    fn as_err_code(&self) -> ErrCode {
+        self.code
     }
 }
 
