@@ -1,12 +1,13 @@
 //! Linux socket.
-use core::ffi::{CStr, c_char};
-use core::task::Poll;
+use core::mem::MaybeUninit;
 use core::{error, fmt, mem, result};
 
 use crate::error::{AsErrCode, ErrCode};
 use crate::fd::{AsRawFd, FromRawFd, OwnedFd, impl_fd_simple};
 use crate::flags::{OpenFlag, impl_bitops_simple};
 use crate::io::{Read, ReadError, Write, WriteError};
+use crate::net::addr::{AddrError, SockAddr};
+use crate::net::msg::{RecvFlags, SendFlags};
 
 // ===== Socket =====
 
@@ -84,6 +85,22 @@ impl Write for Socket {
 
 // would block
 impl Socket {
+    /// Send message on this fd.
+    #[inline]
+    pub fn send(&self, buf: &[u8], flags: SendFlags) -> Result<usize> {
+        let fd = self.as_raw_fd();
+        let res = unsafe { libc::send(fd, buf.as_ptr().cast(), buf.len(), flags.into()) };
+        usize::try_from(res).map_err(|_| Error::errno(Kind::Write))
+    }
+
+    /// Receive message from this fd.
+    #[inline]
+    pub fn recv(&self, buf: &mut [MaybeUninit<u8>], flags: RecvFlags) -> Result<usize> {
+        let fd = self.as_raw_fd();
+        let res = unsafe { libc::recv(fd, buf.as_mut_ptr().cast(), buf.len(), flags.into()) };
+        usize::try_from(res).map_err(|_| Error::errno(Kind::Read))
+    }
+
     /// Accept a connection on this socket.
     #[inline]
     pub fn accept(&self) -> Result<Self> {
@@ -94,101 +111,6 @@ impl Socket {
     #[inline]
     pub fn accept4(&self, flags: Flags) -> Result<Self> {
         unsafe { fd(libc::accept4(self.as_raw_fd(), 0 as _, 0 as _, flags.0), Kind::Accept) }
-    }
-
-    /// Poll accept a connection on this socket.
-    #[inline]
-    pub fn poll_accept(&self) -> Poll<Result<Self>> {
-        ep(Self::accept(self))
-    }
-
-    /// Poll accept a connection on this socket and apply given flags.
-    #[inline]
-    pub fn poll_accept4(&self, flags: Flags) -> Poll<Result<Self>> {
-        ep(Self::accept4(self, flags))
-    }
-}
-
-// ===== SockAddr =====
-
-/// A socket address.
-pub trait SockAddr: sealed::Sealed {}
-mod sealed {
-    pub trait Sealed: Sized {
-        type Raw;
-        fn as_raw(&self) -> (&Self::Raw, libc::socklen_t);
-        fn from_raw(raw: Self::Raw, len: u32) -> Result<Self, super::AddrError>;
-    }
-}
-
-// ===== SockaddrUn =====
-
-const SUN_PATH_OFFSET: usize = mem::offset_of!(libc::sockaddr_un, sun_path);
-
-/// UNIX domain socket address.
-#[derive(Debug)]
-pub struct SockaddrUn {
-    addr: libc::sockaddr_un,
-    len: u32,
-}
-
-impl SockaddrUn {
-    /// Creates [`SockaddrUn`] with given path.
-    #[inline]
-    pub const fn from_path(path: &CStr) -> Result<Self, AddrError> {
-        let mut addr = unsafe { mem::zeroed::<libc::sockaddr_un>() };
-        addr.sun_family = libc::AF_UNIX as _;
-        let path = path.to_bytes_with_nul();
-        if path.len() > addr.sun_path.len() {
-            return Err(AddrError::ExcessivePath);
-        }
-        unsafe {
-            addr.sun_path
-                .as_mut_ptr()
-                .copy_from_nonoverlapping(path.as_ptr().cast(), path.len());
-        };
-        // `unix(7)`
-        let len = (SUN_PATH_OFFSET + path.len()) as _;
-        Ok(Self { addr, len })
-    }
-
-    /// Returns the address pathname.
-    #[inline]
-    pub fn as_pathname(&self) -> Option<&CStr> {
-        // `unix(7)`
-        let addr_len = self.len as usize - SUN_PATH_OFFSET;
-        if addr_len == 0 {
-            // unnamed
-            return None;
-        } else if self.addr.sun_path[0] == 0 {
-            // abstract
-            return None;
-        }
-        unsafe {
-            let path = mem::transmute::<&[c_char], &[u8]>(&self.addr.sun_path[..]);
-            let path = path.get_unchecked(..addr_len);
-            Some(CStr::from_bytes_with_nul_unchecked(path))
-        }
-    }
-}
-
-impl SockAddr for SockaddrUn {}
-impl sealed::Sealed for SockaddrUn {
-    type Raw = libc::sockaddr_un;
-
-    #[inline]
-    fn as_raw(&self) -> (&Self::Raw, libc::socklen_t) {
-        (&self.addr, self.len)
-    }
-
-    #[inline]
-    fn from_raw(addr: Self::Raw, mut len: u32) -> Result<Self, AddrError> {
-        if len == 0 {
-            len = SUN_PATH_OFFSET as _;
-        } else if addr.sun_family != libc::AF_UNIX as _ {
-            return Err(AddrError::MissmatchDomain);
-        }
-        Ok(Self { addr, len })
     }
 }
 
@@ -220,7 +142,6 @@ impl Domain {
 #[repr(transparent)]
 pub struct Type(i32);
 
-// `/usr/include/bits/socket.h`
 impl Type {
     /// Provides sequenced, reliable, two-way, connection-based byte streams.
     ///
@@ -239,7 +160,6 @@ impl Type {
 #[repr(transparent)]
 pub struct Flags(i32);
 
-// `/usr/include/bits/socket.h`
 impl Flags {
     /// Set the close-on-exec (FD_CLOEXEC) flag on the new fd.
     pub const CLOEXEC: Self = Self(libc::SOCK_CLOEXEC);
@@ -268,19 +188,6 @@ fn e(res: i32, kind: Kind) -> Result<()> {
         return Err(Error::errno(kind));
     }
     Ok(())
-}
-
-fn ep<T>(res: Result<T>) -> Poll<Result<T>> {
-    match res {
-        Ok(ok) => Poll::Ready(Ok(ok)),
-        Err(err) => {
-            if err.code.would_block() {
-                Poll::Pending
-            } else {
-                Poll::Ready(Err(err))
-            }
-        }
-    }
 }
 
 /// Type alias for result of [`Socket`] operations.
@@ -361,28 +268,5 @@ impl fmt::Display for Error {
             Kind::Addr(_) => "create socket address",
         };
         write!(f, "failed to {msg}: {cause}")
-    }
-}
-
-// ===== SockAddrError =====
-
-/// An error that occur when validating socket address.
-#[derive(Debug, Clone, Copy)]
-pub enum AddrError {
-    /// Address path length exceeds maximum capacity.
-    ExcessivePath,
-    /// Domain in generic socket address does not match.
-    MissmatchDomain,
-}
-
-impl error::Error for AddrError {}
-
-impl fmt::Display for AddrError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let msg = match self {
-            Self::ExcessivePath => "excessive path length",
-            Self::MissmatchDomain => "missmatch domain name",
-        };
-        msg.fmt(f)
     }
 }

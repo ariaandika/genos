@@ -2,7 +2,7 @@ use std::ffi::CString;
 use std::mem::MaybeUninit;
 use std::{env, fmt};
 
-use genos::io::{Read, Write};
+use genos::net::msg::RecvFlags;
 use genos::net::{OpenFlag, SockaddrUn, Socket};
 
 fn main() -> Result<(), Error> {
@@ -20,13 +20,14 @@ fn main() -> Result<(), Error> {
         println!("connected to {:?}", path);
     }
 
-    socket.write(b"Hello World!")?;
+    socket.send(b"Hello World!", <_>::default())?;
 
     let mut buf = [MaybeUninit::uninit(); 128];
-    let len = socket.read(&mut buf)?;
+    let len = socket.recv(&mut buf, RecvFlags::PEEK)?;
     let read = unsafe { buf[..len].assume_init_ref() };
     let read = str::from_utf8(read).unwrap_or("<non-utf8>");
     println!("read: {read:?}");
+    assert_eq!(socket.recv(&mut buf, <_>::default())?, len);
     Ok(())
 }
 
