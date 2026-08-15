@@ -7,5 +7,6 @@ pub mod fd;
 pub mod flags;
 
 pub mod event;
+pub mod io;
 pub mod net;
 pub mod signal;

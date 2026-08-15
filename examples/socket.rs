@@ -1,6 +1,8 @@
 use std::ffi::CString;
+use std::mem::MaybeUninit;
 use std::{env, fmt};
 
+use genos::io::{Read, Write};
 use genos::net::{OpenFlag, SockaddrUn, Socket};
 
 fn main() -> Result<(), Error> {
@@ -20,9 +22,10 @@ fn main() -> Result<(), Error> {
 
     socket.write(b"Hello World!")?;
 
-    let mut buf = [0u8; 128];
+    let mut buf = [MaybeUninit::uninit(); 128];
     let len = socket.read(&mut buf)?;
-    let read = str::from_utf8(&buf[..len]).unwrap_or("<non-utf8>");
+    let read = unsafe { buf[..len].assume_init_ref() };
+    let read = str::from_utf8(read).unwrap_or("<non-utf8>");
     println!("read: {read:?}");
     Ok(())
 }

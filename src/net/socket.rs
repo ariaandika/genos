@@ -6,6 +6,7 @@ use core::{error, fmt, mem, result};
 use crate::error::{AsErrCode, ErrCode};
 use crate::fd::{AsRawFd, FromRawFd, OwnedFd, impl_fd_simple};
 use crate::flags::{OpenFlag, impl_bitops_simple};
+use crate::io::{Read, ReadError, Write, WriteError};
 
 // ===== Socket =====
 
@@ -73,22 +74,16 @@ impl Socket {
     }
 }
 
+impl Read for Socket {
+    type Error = Error;
+}
+
+impl Write for Socket {
+    type Error = Error;
+}
+
 // would block
 impl Socket {
-    /// Read from this socket.
-    #[inline]
-    pub fn read(&self, buf: &mut [u8]) -> Result<usize> {
-        let ptr = buf.as_mut_ptr().cast();
-        unsafe { io(libc::read(self.as_raw_fd(), ptr, buf.len()), Kind::Read) }
-    }
-
-    /// Write to this socket.
-    #[inline]
-    pub fn write(&self, buf: &[u8]) -> Result<usize> {
-        let ptr = buf.as_ptr().cast();
-        unsafe { io(libc::write(self.as_raw_fd(), ptr, buf.len()), Kind::Write) }
-    }
-
     /// Accept a connection on this socket.
     #[inline]
     pub fn accept(&self) -> Result<Self> {
@@ -99,18 +94,6 @@ impl Socket {
     #[inline]
     pub fn accept4(&self, flags: Flags) -> Result<Self> {
         unsafe { fd(libc::accept4(self.as_raw_fd(), 0 as _, 0 as _, flags.0), Kind::Accept) }
-    }
-
-    /// Poll read from this socket.
-    #[inline]
-    pub fn poll_read(&self, buf: &mut [u8]) -> Poll<Result<usize>> {
-        ep(Self::read(self, buf))
-    }
-
-    /// Poll write to this socket.
-    #[inline]
-    pub fn poll_write(&self, buf: &[u8]) -> Poll<Result<usize>> {
-        ep(Self::write(self, buf))
     }
 
     /// Poll accept a connection on this socket.
@@ -287,13 +270,6 @@ fn e(res: i32, kind: Kind) -> Result<()> {
     Ok(())
 }
 
-fn io(res: isize, kind: Kind) -> Result<usize> {
-    match usize::try_from(res) {
-        Ok(ok) => Ok(ok),
-        Err(_) => Err(Error::errno(kind)),
-    }
-}
-
 fn ep<T>(res: Result<T>) -> Poll<Result<T>> {
     match res {
         Ok(ok) => Poll::Ready(Ok(ok)),
@@ -340,6 +316,20 @@ impl From<AddrError> for Error {
     #[inline]
     fn from(v: AddrError) -> Self {
         Self { kind: Kind::Addr(v), code: ErrCode::new(libc::EINVAL) }
+    }
+}
+
+impl From<ReadError> for Error {
+    #[inline]
+    fn from(v: ReadError) -> Self {
+        Self { kind: Kind::Read, code: v.into() }
+    }
+}
+
+impl From<WriteError> for Error {
+    #[inline]
+    fn from(v: WriteError) -> Self {
+        Self { kind: Kind::Write, code: v.into() }
     }
 }
 
