@@ -17,4 +17,5 @@ pub mod alloc;
 pub mod event;
 pub mod io;
 pub mod net;
+pub mod process;
 pub mod signal;

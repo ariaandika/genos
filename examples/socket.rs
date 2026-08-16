@@ -1,19 +1,18 @@
-use std::ffi::CString;
-use std::mem::MaybeUninit;
-use std::{env, fmt};
+use core::fmt;
+use core::mem::MaybeUninit;
 
 use genos::net::addr::SockaddrUn;
 use genos::net::socket::RecvFlags;
 use genos::net::{OpenFlag, Socket};
+use genos::process;
 
 fn main() -> Result<(), Error> {
-    let Some(path) = env::args().nth(1) else {
+    let Some(path) = process::args().nth(1) else {
         return Err("path argument required".to_string().into());
     };
-    let path = CString::new(path)?;
 
     let socket = Socket::unix_stream(<_>::CLOEXEC)?;
-    socket.connect(&SockaddrUn::from_path(&path)?)?;
+    socket.connect(&SockaddrUn::from_path(path)?)?;
 
     if let Ok(addr) = socket.peer_addr::<SockaddrUn>()
         && let Some(path) = addr.as_pathname()
