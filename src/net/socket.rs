@@ -7,7 +7,7 @@ use crate::fd::{AsRawFd, FromRawFd, OwnedFd, impl_fd_simple};
 use crate::flags::{OpenFlag, impl_bitops_simple};
 use crate::io::{Read, ReadError, Write, WriteError};
 use crate::net::addr::{AddrError, SockAddr};
-use crate::net::msg::{RecvFlags, SendFlags};
+use crate::net::msg::MsgHdr;
 
 // ===== Socket =====
 
@@ -89,7 +89,14 @@ impl Socket {
     #[inline]
     pub fn send(&self, buf: &[u8], flags: SendFlags) -> Result<usize> {
         let fd = self.as_raw_fd();
-        let res = unsafe { libc::send(fd, buf.as_ptr().cast(), buf.len(), flags.into()) };
+        let res = unsafe { libc::send(fd, buf.as_ptr().cast(), buf.len(), flags.0) };
+        usize::try_from(res).map_err(|_| Error::errno(Kind::Write))
+    }
+
+    /// Send message on this fd.
+    #[inline]
+    pub fn sendmsg(&self, msg: &MsgHdr, flags: SendFlags) -> Result<usize> {
+        let res = unsafe { libc::sendmsg(self.as_raw_fd(), msg as *const _ as _, flags.0) };
         usize::try_from(res).map_err(|_| Error::errno(Kind::Write))
     }
 
@@ -97,7 +104,14 @@ impl Socket {
     #[inline]
     pub fn recv(&self, buf: &mut [MaybeUninit<u8>], flags: RecvFlags) -> Result<usize> {
         let fd = self.as_raw_fd();
-        let res = unsafe { libc::recv(fd, buf.as_mut_ptr().cast(), buf.len(), flags.into()) };
+        let res = unsafe { libc::recv(fd, buf.as_mut_ptr().cast(), buf.len(), flags.0) };
+        usize::try_from(res).map_err(|_| Error::errno(Kind::Read))
+    }
+
+    /// Receive message from this fd.
+    #[inline]
+    pub fn recvmsg(&self, msg: &mut MsgHdr, flags: RecvFlags) -> Result<usize> {
+        let res = unsafe { libc::recvmsg(self.as_raw_fd(), msg as *mut _ as _, flags.0) };
         usize::try_from(res).map_err(|_| Error::errno(Kind::Read))
     }
 
@@ -173,6 +187,41 @@ impl OpenFlag for Flags {
 }
 
 impl_bitops_simple!(Flags);
+
+// ===== SendFlags =====
+
+/// Message sending operation flags.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[repr(transparent)]
+pub struct SendFlags(i32);
+
+impl SendFlags {
+    /// Enables nonblocking operation; if the operation would block, the call fails with EAGAIN or
+    /// EWOULDBLOCK.
+    pub const DONTWAIT: Self = Self(libc::MSG_DONTWAIT);
+}
+
+impl_bitops_simple!(SendFlags);
+
+// ===== RecvFlags =====
+
+/// Message receiving operation flags.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[repr(transparent)]
+pub struct RecvFlags(i32);
+
+impl RecvFlags {
+    /// Set the close-on-exec flag for the fd received via a UNIX domain fd using the `SCM_RIGHTS`
+    /// operation.
+    pub const CMSG_CLOEXEC: Self = Self(libc::MSG_CMSG_CLOEXEC);
+    /// Enables nonblocking operation; if the operation would block, the call fails with EAGAIN or
+    /// EWOULDBLOCK.
+    pub const DONTWAIT: Self = Self(libc::MSG_DONTWAIT);
+    /// Receive message without removing that data from the queue.
+    pub const PEEK: Self = Self(libc::MSG_PEEK);
+}
+
+impl_bitops_simple!(RecvFlags);
 
 // ===== Error =====
 

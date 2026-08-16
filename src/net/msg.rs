@@ -1,53 +1,54 @@
 //! Socket message.
-use crate::flags::impl_bitops_simple;
+use core::{ffi, marker};
 
-// ===== SendFlags =====
+use crate::net::iovec::IoVecMut;
 
-/// Message sending operation flags.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-#[repr(transparent)]
-pub struct SendFlags(i32);
+// ===== AncillaryData =====
 
-impl SendFlags {
-    /// Enables nonblocking operation; if the operation would block, the call fails with EAGAIN or
-    /// EWOULDBLOCK.
-    pub const DONTWAIT: Self = Self(libc::MSG_DONTWAIT);
-}
+/// Ancillary data.
+pub trait AncillaryData: sealed::Sealed {}
 
-impl_bitops_simple!(SendFlags);
-
-// ===== RecvFlags =====
-
-/// Message receiving operation flags.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-#[repr(transparent)]
-pub struct RecvFlags(i32);
-
-impl RecvFlags {
-    /// Set the close-on-exec flag for the fd received via a UNIX domain fd using the `SCM_RIGHTS`
-    /// operation.
-    pub const CMSG_CLOEXEC: Self = Self(libc::MSG_CMSG_CLOEXEC);
-    /// Enables nonblocking operation; if the operation would block, the call fails with EAGAIN or
-    /// EWOULDBLOCK.
-    pub const DONTWAIT: Self = Self(libc::MSG_DONTWAIT);
-    /// Receive message without removing that data from the queue.
-    pub const PEEK: Self = Self(libc::MSG_PEEK);
-}
-
-impl_bitops_simple!(RecvFlags);
-
-// ===== impl traits =====
-
-impl From<SendFlags> for i32 {
-    #[inline]
-    fn from(value: SendFlags) -> Self {
-        value.0
+pub(crate) mod sealed {
+    pub trait Sealed {
+        fn as_mut_ptr(&mut self) -> *mut super::ffi::c_void;
+        fn space(&self) -> usize;
     }
 }
 
-impl From<RecvFlags> for i32 {
+// ===== MsgHdr =====
+
+/// Message header.
+#[derive(Debug, Clone)]
+#[repr(transparent)]
+pub struct MsgHdr<'io, 'ct> {
+    hdr: libc::msghdr,
+    _p: marker::PhantomData<&'io ()>,
+    _q: marker::PhantomData<&'ct ()>,
+}
+
+impl<'io, 'ct> MsgHdr<'io, 'ct> {
+    /// Creates new [`MsgHdr`].
     #[inline]
-    fn from(value: RecvFlags) -> Self {
-        value.0
+    pub fn new(iov: &'io mut [IoVecMut<'io>], flags: i32) -> Self {
+        Self {
+            hdr: libc::msghdr {
+                msg_name: 0 as _,
+                msg_namelen: 0,
+                msg_iov: iov.as_mut_ptr().cast(),
+                msg_iovlen: iov.len(),
+                msg_control: 0 as _,
+                msg_controllen: 0,
+                msg_flags: flags,
+            },
+            _p: marker::PhantomData,
+            _q: marker::PhantomData,
+        }
+    }
+
+    /// Set control message data.
+    #[inline]
+    pub fn set_control_buf<C: AncillaryData>(&mut self, cmsg: &mut C) {
+        self.hdr.msg_control = cmsg.as_mut_ptr();
+        self.hdr.msg_controllen = cmsg.space();
     }
 }

@@ -2,8 +2,9 @@ use std::ffi::CString;
 use std::mem::MaybeUninit;
 use std::{env, fmt};
 
-use genos::net::msg::RecvFlags;
-use genos::net::{OpenFlag, SockaddrUn, Socket};
+use genos::net::addr::SockaddrUn;
+use genos::net::socket::RecvFlags;
+use genos::net::{OpenFlag, Socket};
 
 fn main() -> Result<(), Error> {
     let Some(path) = env::args().nth(1) else {
