@@ -1,16 +1,18 @@
+#![no_std]
+#![no_main]
 use core::fmt;
 use core::mem::MaybeUninit;
 
-use genos::io::{Stdout, Write};
 use genos::net::addr::SockaddrUn;
 use genos::net::socket::RecvFlags;
 use genos::net::{OpenFlag, Socket};
-use genos::process;
+use genos::println;
+use genos::process::Args;
 
-fn main() -> Result<(), Error> {
-    let Some(path) = process::args().nth(1) else {
-        return Err("path argument required".to_string().into());
-    };
+genos::main!(|args| start(args).is_err() as _);
+
+fn start(mut args: Args) -> Result<(), Error> {
+    let path = args.nth(1).ok_or("path argument required")?;
 
     let socket = Socket::unix_stream(<_>::CLOEXEC)?;
     socket.connect(&SockaddrUn::from_path(path)?)?;
@@ -18,9 +20,7 @@ fn main() -> Result<(), Error> {
     if let Ok(addr) = socket.peer_addr::<SockaddrUn>()
         && let Some(path) = addr.as_pathname()
     {
-        Stdout.write(b"connected to ")?;
-        Stdout.write(path.to_bytes())?;
-        Stdout.write(b"\n")?;
+        println!("connected to {path:?}");
     }
 
     socket.send(b"Hello World!", <_>::default())?;
@@ -29,22 +29,16 @@ fn main() -> Result<(), Error> {
     let len = socket.recv(&mut buf, RecvFlags::PEEK)?;
     let read = unsafe { buf[..len].assume_init_ref() };
     let read = str::from_utf8(read).unwrap_or("<non-utf8>");
-    Stdout.write(b"read: ")?;
-    Stdout.write(read.as_bytes())?;
+    println!("read: {read:?}");
     assert_eq!(socket.recv(&mut buf, <_>::default())?, len);
     Ok(())
 }
 
-struct Error(String);
-
-impl fmt::Debug for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "{}", self.0)
-    }
-}
+struct Error;
 
 impl<E: fmt::Display> From<E> for Error {
     fn from(value: E) -> Self {
-        Self(value.to_string())
+        println!("{value}");
+        Self
     }
 }

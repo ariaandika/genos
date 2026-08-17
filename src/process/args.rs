@@ -1,5 +1,7 @@
 use core::{ffi, slice};
 
+pub use Iter as Args;
+
 /// Returns raw command line arguments
 #[inline]
 pub fn raw_args() -> &'static [*const i8] {
@@ -31,7 +33,17 @@ impl Iterator for Iter {
 }
 
 impl Iter {
-    pub(super) fn new() -> Self {
+    /// Create arguments iterator from raw parts.
+    ///
+    /// # Safety
+    ///
+    /// This is only intended to be created right at the start of the main function.
+    #[inline]
+    pub unsafe fn from_raw_parts(argc: i32, argv: *const *const ffi::c_char) -> Self {
+        Self(unsafe { slice::from_raw_parts(argv, argc as _).iter() })
+    }
+
+    fn new() -> Self {
         Self(raw_args().iter())
     }
 }
