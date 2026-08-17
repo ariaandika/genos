@@ -14,6 +14,7 @@ pub mod fd;
 pub mod flags;
 
 pub mod alloc;
+pub mod env;
 pub mod event;
 pub mod io;
 pub mod net;
