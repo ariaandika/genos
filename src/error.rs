@@ -1,7 +1,6 @@
 //! Error types.
-use core::ffi::CStr;
 use core::num::NonZeroU8;
-use core::{error, fmt};
+use core::{error, ffi, fmt};
 
 // ===== traits =====
 
@@ -96,14 +95,32 @@ impl fmt::Display for ErrCode {
         let mut buf = [0u8; 128];
         let res = unsafe { libc::strerror_r(code, buf.as_mut_ptr().cast(), buf.len()) };
         let msg = if res >= 0 {
-            CStr::from_bytes_until_nul(&buf[..])
-                .unwrap_or(c"unknown")
-                .to_string_lossy()
+            format_args!(
+                "{}",
+                fmt::from_fn(|f| {
+                    fmt_lossy(ffi::CStr::from_bytes_until_nul(&buf[..]).unwrap_or(c"unknown"), f)
+                })
+            )
         } else {
-            "unknown".into()
+            format_args!("unknown")
         };
         write!(f, "{msg} (os error {code})",)
     }
+}
+
+fn fmt_lossy(cstr: &ffi::CStr, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+    write!(f, "\"")?;
+    for chunk in cstr.to_bytes().utf8_chunks() {
+        for c in chunk.valid().chars() {
+            match c {
+                '\0' => write!(f, "\\0")?,
+                '\x01'..='\x7f' => write!(f, "{}", (c as u8).escape_ascii())?,
+                _ => write!(f, "{}", c.escape_debug())?,
+            }
+        }
+        write!(f, "{}", chunk.invalid().escape_ascii())?;
+    }
+    write!(f, "\"")
 }
 
 // ===== macros =====
@@ -153,3 +170,5 @@ macro_rules! os_error_simple {
     };
 }
 pub(crate) use os_error_simple;
+#[allow(unused_imports)]
+pub(crate) use os_error_simple as impl_error_os_simple;

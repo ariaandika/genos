@@ -1,15 +1,39 @@
-pub use arg::Iter;
+use core::{ffi, slice};
 
 /// Returns raw command line arguments
 #[inline]
-pub fn raw_args<'a>() -> &'a [*const i8] {
+pub fn raw_args() -> &'static [*const i8] {
     arg::raw_args()
 }
 
 /// Returns iterator of command line arguments.
 #[inline]
-pub fn args<'a>() -> Iter<'a> {
+pub fn args() -> Iter {
     Iter::new()
+}
+
+type Inner = slice::Iter<'static, *const i8>;
+
+/// Iterator of command line arguments.
+#[derive(Debug)]
+pub struct Iter(Inner);
+
+impl Iterator for Iter {
+    type Item = &'static ffi::CStr;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0
+            .next()
+            .filter(|e| !e.is_null())
+            .map(|e| unsafe { ffi::CStr::from_ptr(*e) })
+    }
+}
+
+impl Iter {
+    pub(super) fn new() -> Self {
+        Self(raw_args().iter())
+    }
 }
 
 // ===== extern =====
@@ -17,7 +41,7 @@ pub fn args<'a>() -> Iter<'a> {
 #[cfg(all(target_os = "linux", target_env = "gnu"))]
 mod arg {
     // source: dtolnay/argv
-    use core::{ffi, iter, slice};
+    use core::{ffi, slice};
 
     static mut ARGC: i32 = 0;
     static mut ARGV: *const *const ffi::c_char = 0 as _;
@@ -35,50 +59,14 @@ mod arg {
     #[used]
     static CAPTURE: unsafe extern "C" fn(ffi::c_int, *const *const ffi::c_char) = capture;
 
-    #[inline]
     pub fn raw_args() -> &'static [*const i8] {
         unsafe { slice::from_raw_parts(ARGV, ARGC as _) }
-    }
-
-    type Inner<'a> = iter::Map<
-        iter::Filter<iter::Copied<slice::Iter<'static, *const i8>>, fn(&*const i8) -> bool>,
-        fn(*const i8) -> &'a ffi::CStr,
-    >;
-
-    /// Iterator of command line arguments.
-    #[derive(Debug)]
-    pub struct Iter<'a>(Inner<'a>);
-
-    impl<'a> Iterator for Iter<'a> {
-        type Item = &'a ffi::CStr;
-
-        #[inline]
-        fn next(&mut self) -> Option<Self::Item> {
-            self.0.next()
-        }
-    }
-
-    impl<'a> Iter<'a> {
-        #[inline]
-        pub(super) fn new() -> Self {
-            fn fun_name2(e: &*const i8) -> bool {
-                !e.is_null()
-            }
-            fn fun_name<'a>(e: *const i8) -> &'a std::ffi::CStr {
-                unsafe { ffi::CStr::from_ptr(e) }
-            }
-            Self(
-                raw_args()
-                    .iter()
-                    .copied()
-                    .filter(fun_name2 as _)
-                    .map(fun_name),
-            )
-        }
     }
 }
 
 #[cfg(not(any(target_os = "linux", target_env = "gnu")))]
 mod arg {
-    compile_error!("raw_args() not supported");
+    pub fn raw_args() -> &'static [*const i8] {
+        panic!("raw_args() is not yet supported in other platform");
+    }
 }
