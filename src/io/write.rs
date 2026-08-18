@@ -1,7 +1,8 @@
 use core::error;
 
-use crate::error::{ErrCode, FromErrCode, os_error_simple};
-use crate::fd::{AsFd, AsRawFd};
+use crate::error::{ErrCode, FromErrCode, impl_error_os_simple};
+use crate::fd::AsFd;
+use crate::sys;
 
 /// A writable file descriptor.
 pub trait Write: AsFd {
@@ -12,13 +13,13 @@ pub trait Write: AsFd {
     ///
     /// On success, the number of bytes written is returned.
     ///
-    /// The number of bytes written may be less than count if, for example, there is insufficient space on the underlying physical medium, or the RLIMIT_FSIZE resource limit is encountered (see setrlimit(2)), or the
-    /// call was interrupted by a signal handler after having written less than count bytes.
+    /// The number of bytes written may be less than count if, for example, there is insufficient
+    /// space on the underlying physical medium, or the RLIMIT_FSIZE resource limit is encountered,
+    /// or the call was interrupted by a signal handler after having written less than count bytes.
     #[inline]
     fn write(&self, buf: &[u8]) -> Result<usize, Self::Error> {
-        let fd = self.as_fd().as_raw_fd();
-        let res = unsafe { libc::write(fd, buf.as_ptr().cast(), buf.len()) };
-        usize::try_from(res).map_err(|_| WriteError::errno().into())
+        let res = sys::call!(RD, __NR_write, self.as_fd(), buf, buf.len());
+        WriteError::es(res).map_err(<_>::into)
     }
 }
 
@@ -26,4 +27,4 @@ pub trait Write: AsFd {
 #[derive(Clone, Copy)]
 pub struct WriteError(ErrCode);
 
-os_error_simple!(WriteError, "write to fd");
+impl_error_os_simple!(WriteError, "write to fd");

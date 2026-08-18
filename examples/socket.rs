@@ -29,7 +29,7 @@ fn start(mut args: Args) -> Result<(), Error> {
     let len = socket.recv(&mut buf, RecvFlags::PEEK)?;
     let read = unsafe { buf[..len].assume_init_ref() };
     let read = str::from_utf8(read).unwrap_or("<non-utf8>");
-    println!("read: {read:?}");
+    println!("read({len}): {read:?}");
     assert_eq!(socket.recv(&mut buf, <_>::default())?, len);
     Ok(())
 }

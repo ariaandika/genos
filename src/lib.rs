@@ -10,6 +10,8 @@
 )]
 #![allow(clippy::module_inception, clippy::new_without_default, clippy::len_without_is_empty)]
 
+mod sys;
+
 pub mod error;
 pub mod fd;
 pub mod flags;

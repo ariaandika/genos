@@ -21,16 +21,31 @@ pub(crate) trait FromErrCode: Sized {
         if res == -1 {
             return Err(Self::errno());
         }
-        Ok(T::from_ok_code(res))
+        Ok(T::from_ok_code(res as _))
+    }
+
+    /// Convert result from syscall.
+    #[inline]
+    fn es<T: FromOkCode>(res: isize) -> Result<T, Self> {
+        match usize::try_from(res) {
+            Ok(ok) => Ok(<_>::from_ok_code(ok)),
+            Err(_) => Err(<_>::from_err_code(ErrCode::new(res.wrapping_neg() as _))),
+        }
     }
 }
 
 pub(crate) trait FromOkCode {
-    fn from_ok_code(code: i32) -> Self;
+    fn from_ok_code(code: usize) -> Self;
+}
+
+impl FromOkCode for usize {
+    fn from_ok_code(val: usize) -> Self {
+        val
+    }
 }
 
 impl FromOkCode for () {
-    fn from_ok_code(_: i32) -> Self {}
+    fn from_ok_code(_: usize) -> Self {}
 }
 
 // ===== AsErrCode =====

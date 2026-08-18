@@ -9,5 +9,5 @@ mod main;
 /// Terminate process with given status code.
 #[inline]
 pub fn _exit(status: i32) -> ! {
-    unsafe { libc::_exit(status) }
+    crate::sys::call!(NORETURN, __NR_exit, status)
 }
