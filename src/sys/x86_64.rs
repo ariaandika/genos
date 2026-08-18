@@ -2,6 +2,8 @@
 use core::arch::asm;
 use core::ffi::c_long;
 
+use crate::sys::shared;
+
 // syscall arguments use register-sized types
 // syscall return values use register-sized types
 //
@@ -20,6 +22,20 @@ use core::ffi::c_long;
 // "rax" contains syscall nr as input, then syscall returns the value back to it
 //
 // More on Rust inline assembly: https://doc.rust-lang.org/reference/inline-assembly.html
+
+#[inline]
+pub(crate) unsafe fn call1_rd(nr: c_long, a1: usize) -> isize {
+    let ret;
+    asm!(
+        "syscall",
+        inlateout("rax") nr => ret,
+        in("rdi") a1,
+        lateout("rcx") _,
+        lateout("r11") _,
+        options(nostack, preserves_flags, readonly)
+    );
+    ret
+}
 
 #[inline]
 pub(crate) unsafe fn call1_noret(nr: c_long, a1: usize) -> ! {
@@ -58,6 +74,40 @@ pub(crate) unsafe fn call3_rd(nr: c_long, a1: usize, a2: usize, a3: usize) -> is
         in("rdi") a1,
         in("rsi") a2,
         in("rdx") a3,
+        lateout("rcx") _,
+        lateout("r11") _,
+        options(nostack, preserves_flags, readonly)
+    );
+    ret
+}
+
+#[inline]
+pub(crate) unsafe fn call4(nr: c_long, a1: usize, a2: usize, a3: usize, a4: usize) -> isize {
+    let ret;
+    asm!(
+        "syscall",
+        inlateout("rax") nr => ret,
+        in("rdi") a1,
+        in("rsi") a2,
+        in("rdx") a3,
+        in("r10") a4,
+        lateout("rcx") _,
+        lateout("r11") _,
+        options(nostack, preserves_flags)
+    );
+    ret
+}
+
+#[inline]
+pub(crate) unsafe fn call4_rd(nr: c_long, a1: usize, a2: usize, a3: usize, a4: usize) -> isize {
+    let ret;
+    asm!(
+        "syscall",
+        inlateout("rax") nr => ret,
+        in("rdi") a1,
+        in("rsi") a2,
+        in("rdx") a3,
+        in("r10") a4,
         lateout("rcx") _,
         lateout("r11") _,
         options(nostack, preserves_flags, readonly)
@@ -463,3 +513,5 @@ pub const __NR_file_setattr: c_long = 469;
 pub const __NR_listns: c_long = 470;
 pub const __NR_rseq_slice_yield: c_long = 471;
 pub const __NR_fchroot: c_long = 472;
+
+pub use shared::O_CLOEXEC;
