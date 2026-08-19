@@ -63,6 +63,21 @@ pub(crate) unsafe fn call1_noret(nr: c_long, a1: usize) -> ! {
 }
 
 #[inline]
+pub(crate) unsafe fn call2(nr: c_long, a1: usize, a2: usize) -> SysRes {
+    let ret;
+    asm!(
+        "syscall",
+        inlateout("rax") nr => ret,
+        in("rdi") a1,
+        in("rsi") a2,
+        lateout("rcx") _,
+        lateout("r11") _,
+        options(nostack, preserves_flags)
+    );
+    SysRes::new(ret)
+}
+
+#[inline]
 pub(crate) unsafe fn call2_rd(nr: c_long, a1: usize, a2: usize) -> SysRes {
     let ret;
     asm!(
