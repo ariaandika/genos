@@ -1,11 +1,11 @@
 //! Signal management.
-pub use signalfd::Signalfd;
 pub use signo::Signo;
 pub use sigset::Sigset;
+pub use signalfd::Signalfd;
 
-pub mod signalfd;
 mod signo;
 mod sigset;
+pub mod signalfd;
 
 /// Signal operation error types.
 pub mod error {

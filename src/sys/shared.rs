@@ -1,4 +1,4 @@
-// include/uapi/asm-generic/fcntl.h
+// source: include/uapi/asm-generic/fcntl.h
 
 // #define O_ACCMODE	3
 // #define O_RDONLY	0
@@ -18,3 +18,9 @@ pub const O_NONBLOCK: i32 = 1 << 11;
 // #define O_NOFOLLOW	(1 << 17)	/* don't follow links */
 // #define O_NOATIME	(1 << 18)
 pub const O_CLOEXEC: i32 = 1 << 19;
+
+// source: include/uapi/asm-generic/signal-defs.h
+
+pub const SIG_BLOCK: i32 = 0; /* for blocking signals */
+pub const SIG_UNBLOCK: i32 = 1; /* for unblocking signals */
+pub const SIG_SETMASK: i32 = 2; /* for setting the signal mask */
