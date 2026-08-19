@@ -1,8 +1,7 @@
 //! Process management.
-pub use args::{Args, args, raw_args};
+pub use main::Args;
 pub use process::{KillError, Process};
 
-mod args;
 mod process;
 mod main;
 

@@ -12,8 +12,8 @@ use genos::process::Args;
 
 genos::main!(|args| start(args).is_err() as _);
 
-fn start(mut args: Args) -> Result<(), Error> {
-    let path = args.nth(1).ok_or("path argument required")?;
+fn start(args: Args) -> Result<(), Error> {
+    let path = args.iter().nth(1).ok_or("path argument required")?;
 
     let socket = Socket::unix_stream(<_>::CLOEXEC)?;
     socket.connect(&SockaddrUn::from_path(path)?)?;
