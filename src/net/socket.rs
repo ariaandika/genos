@@ -220,7 +220,7 @@ error::impl_error_with_kind!(Error, Kind);
 impl From<AddrError> for Error {
     #[inline]
     fn from(v: AddrError) -> Self {
-        Self { kind: Kind::Addr(v), code: ErrCode::new(libc::EINVAL) }
+        Self { kind: Kind::Addr(v), code: ErrCode::EINVAL }
     }
 }
 

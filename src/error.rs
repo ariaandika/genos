@@ -118,6 +118,9 @@ pub trait AsErrCode {
 pub struct ErrCode(NonZeroU8);
 
 impl ErrCode {
+    /// Creates [`ErrCode`] with code for invalid arguments.
+    pub const EINVAL: Self = Self(NonZeroU8::new(EINVAL as _).unwrap());
+
     /// Creates [`ErrCode`] with given error code.
     #[inline]
     pub fn new(code: i32) -> Self {
@@ -138,7 +141,7 @@ impl ErrCode {
     /// Returns raw error code from `errno`.
     #[inline]
     pub fn raw_errno() -> i32 {
-        unsafe { *libc::__errno_location() }
+        unsafe { *__errno_location() }
     }
 
     /// Returns the contained raw error code.
@@ -150,13 +153,13 @@ impl ErrCode {
     /// Returns `true` if error code is `EINTR`.
     #[inline]
     pub fn is_interrupt(self) -> bool {
-        matches!(self.code(), libc::EINTR)
+        matches!(self.code(), EINTR)
     }
 
     /// Returns `true` if error code is `EWOULDBLOCK` or `EAGAIN`.
     #[inline]
     pub fn would_block(self) -> bool {
-        matches!(self.code(), libc::EWOULDBLOCK)
+        matches!(self.code(), EWOULDBLOCK)
     }
 }
 
@@ -168,7 +171,7 @@ impl fmt::Display for ErrCode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let code = Self::code(*self);
         let mut buf = [0u8; 128];
-        let res = unsafe { libc::strerror_r(code, buf.as_mut_ptr().cast(), buf.len()) };
+        let res = unsafe { strerror_r(code, buf.as_mut_ptr().cast(), buf.len()) };
         let msg = if res >= 0 {
             format_args!(
                 "{}",
@@ -184,7 +187,6 @@ impl fmt::Display for ErrCode {
 }
 
 fn fmt_lossy(cstr: &ffi::CStr, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-    write!(f, "\"")?;
     for chunk in cstr.to_bytes().utf8_chunks() {
         for c in chunk.valid().chars() {
             match c {
@@ -195,7 +197,7 @@ fn fmt_lossy(cstr: &ffi::CStr, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         }
         write!(f, "{}", chunk.invalid().escape_ascii())?;
     }
-    write!(f, "\"")
+    Ok(())
 }
 
 // ===== macros =====
@@ -274,3 +276,21 @@ macro_rules! impl_error_with_kind {
     };
 }
 pub(crate) use impl_error_with_kind;
+
+// ===== extern =====
+
+// source: include/uapi/asm-generic/errno-base.h
+
+const EINTR: i32 = 4; /* Interrupted system call */
+const EAGAIN: i32 = 11; /* Try again */
+const EINVAL: i32 = 22; /* Invalid argument */
+
+// source: include/uapi/asm-generic/errno.h
+
+const EWOULDBLOCK: i32 = EAGAIN; /* Operation would block */
+
+unsafe extern "C" {
+    #[link_name = "__xpg_strerror_r"]
+    fn strerror_r(errno: i32, buf: *mut ffi::c_char, len: usize) -> i32;
+    fn __errno_location() -> *mut i32;
+}
