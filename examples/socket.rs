@@ -3,6 +3,7 @@
 use core::fmt;
 use core::mem::MaybeUninit;
 
+use genos::error::AsErrCode;
 use genos::net::addr::SockaddrUn;
 use genos::net::socket::RecvFlags;
 use genos::net::{OpenFlag, Socket};
@@ -31,6 +32,14 @@ fn start(mut args: Args) -> Result<(), Error> {
     let read = str::from_utf8(read).unwrap_or("<non-utf8>");
     println!("read({len}): {read:?}");
     assert_eq!(socket.recv(&mut buf, <_>::default())?, len);
+    assert!(
+        socket
+            .recv(&mut buf, RecvFlags::DONTWAIT)
+            .unwrap_err()
+            .as_err_code()
+            .would_block()
+    );
+
     Ok(())
 }
 

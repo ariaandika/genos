@@ -1,13 +1,13 @@
 //! Socket message.
 use core::{ffi, marker};
 
+use crate::net::addr::socklen_t;
 use crate::net::iovec::IoVecMut;
 
 // ===== AncillaryData =====
 
 /// Ancillary data.
 pub trait AncillaryData: sealed::Sealed {}
-
 pub(crate) mod sealed {
     pub trait Sealed {
         fn as_mut_ptr(&mut self) -> *mut super::ffi::c_void;
@@ -18,10 +18,12 @@ pub(crate) mod sealed {
 // ===== MsgHdr =====
 
 /// Message header.
-#[derive(Debug, Clone)]
+///
+/// See `sendmsg(2)`.
+#[derive(Debug)]
 #[repr(transparent)]
 pub struct MsgHdr<'io, 'ct> {
-    hdr: libc::msghdr,
+    hdr: msghdr,
     _p: marker::PhantomData<&'io ()>,
     _q: marker::PhantomData<&'ct ()>,
 }
@@ -31,7 +33,7 @@ impl<'io, 'ct> MsgHdr<'io, 'ct> {
     #[inline]
     pub fn new(iov: &'io mut [IoVecMut<'io>], flags: i32) -> Self {
         Self {
-            hdr: libc::msghdr {
+            hdr: msghdr {
                 msg_name: 0 as _,
                 msg_namelen: 0,
                 msg_iov: iov.as_mut_ptr().cast(),
@@ -47,8 +49,22 @@ impl<'io, 'ct> MsgHdr<'io, 'ct> {
 
     /// Set control message data.
     #[inline]
-    pub fn set_control_buf<C: AncillaryData>(&mut self, cmsg: &mut C) {
+    pub fn set_control_buf<C: AncillaryData>(&mut self, cmsg: &'ct mut C) {
         self.hdr.msg_control = cmsg.as_mut_ptr();
         self.hdr.msg_controllen = cmsg.space();
     }
+}
+
+// ===== extern =====
+
+#[derive(Debug)]
+#[repr(C)]
+pub(crate) struct msghdr {
+    pub msg_name: *mut ffi::c_void,
+    pub msg_namelen: socklen_t,
+    pub msg_iov: *mut ffi::c_void, // *mut iovec
+    pub msg_iovlen: usize,
+    pub msg_control: *mut ffi::c_void,
+    pub msg_controllen: usize,
+    pub msg_flags: i32,
 }

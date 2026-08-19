@@ -50,6 +50,21 @@ pub(crate) unsafe fn call1_noret(nr: c_long, a1: usize) -> ! {
 }
 
 #[inline]
+pub(crate) unsafe fn call2_rd(nr: c_long, a1: usize, a2: usize) -> isize {
+    let ret;
+    asm!(
+        "syscall",
+        inlateout("rax") nr => ret,
+        in("rdi") a1,
+        in("rsi") a2,
+        lateout("rcx") _,
+        lateout("r11") _,
+        options(nostack, preserves_flags, readonly)
+    );
+    ret
+}
+
+#[inline]
 pub(crate) unsafe fn call3(nr: c_long, a1: usize, a2: usize, a3: usize) -> isize {
     let ret;
     asm!(
@@ -108,6 +123,60 @@ pub(crate) unsafe fn call4_rd(nr: c_long, a1: usize, a2: usize, a3: usize, a4: u
         in("rsi") a2,
         in("rdx") a3,
         in("r10") a4,
+        lateout("rcx") _,
+        lateout("r11") _,
+        options(nostack, preserves_flags, readonly)
+    );
+    ret
+}
+
+#[inline]
+pub(crate) unsafe fn call6(
+    nr: c_long,
+    a1: usize,
+    a2: usize,
+    a3: usize,
+    a4: usize,
+    a5: usize,
+    a6: usize,
+) -> isize {
+    let ret;
+    asm!(
+        "syscall",
+        inlateout("rax") nr => ret,
+        in("rdi") a1,
+        in("rsi") a2,
+        in("rdx") a3,
+        in("r10") a4,
+        in("r8") a5,
+        in("r9") a6,
+        lateout("rcx") _,
+        lateout("r11") _,
+        options(nostack, preserves_flags)
+    );
+    ret
+}
+
+#[inline]
+pub(crate) unsafe fn call6_rd(
+    nr: c_long,
+    a1: usize,
+    a2: usize,
+    a3: usize,
+    a4: usize,
+    a5: usize,
+    a6: usize,
+) -> isize {
+    let ret;
+    asm!(
+        "syscall",
+        inlateout("rax") nr => ret,
+        in("rdi") a1,
+        in("rsi") a2,
+        in("rdx") a3,
+        in("r10") a4,
+        in("r8") a5,
+        in("r9") a6,
         lateout("rcx") _,
         lateout("r11") _,
         options(nostack, preserves_flags, readonly)
@@ -514,4 +583,4 @@ pub const __NR_listns: c_long = 470;
 pub const __NR_rseq_slice_yield: c_long = 471;
 pub const __NR_fchroot: c_long = 472;
 
-pub use shared::O_CLOEXEC;
+pub use shared::*;

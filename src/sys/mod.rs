@@ -82,5 +82,43 @@ macro_rules! call {
             crate::sys::IntoArg::into_arg($a4),
         ) }
     };
+    (RD, $nr:ident, $a1:expr, $a2:expr, $a3:expr, $a4:expr, $a5:expr) => {
+        unsafe { crate::sys::call5_rd(crate::sys::$nr,
+            crate::sys::IntoArg::into_arg($a1),
+            crate::sys::IntoArg::into_arg($a2),
+            crate::sys::IntoArg::into_arg($a3),
+            crate::sys::IntoArg::into_arg($a4),
+            crate::sys::IntoArg::into_arg($a5),
+        ) }
+    };
+    ($nr:ident, $a1:expr, $a2:expr, $a3:expr, $a4:expr, $a5:expr) => {
+        unsafe { crate::sys::call5(crate::sys::$nr,
+            crate::sys::IntoArg::into_arg($a1),
+            crate::sys::IntoArg::into_arg($a2),
+            crate::sys::IntoArg::into_arg($a3),
+            crate::sys::IntoArg::into_arg($a4),
+            crate::sys::IntoArg::into_arg($a5),
+        ) }
+    };
+    (RD, $nr:ident, $a1:expr, $a2:expr, $a3:expr, $a4:expr, $a5:expr, $a6:expr) => {
+        unsafe { crate::sys::call6_rd(crate::sys::$nr,
+            crate::sys::IntoArg::into_arg($a1),
+            crate::sys::IntoArg::into_arg($a2),
+            crate::sys::IntoArg::into_arg($a3),
+            crate::sys::IntoArg::into_arg($a4),
+            crate::sys::IntoArg::into_arg($a5),
+            crate::sys::IntoArg::into_arg($a6),
+        ) }
+    };
+    ($nr:ident, $a1:expr, $a2:expr, $a3:expr, $a4:expr, $a5:expr, $a6:expr) => {
+        unsafe { crate::sys::call6(crate::sys::$nr,
+            crate::sys::IntoArg::into_arg($a1),
+            crate::sys::IntoArg::into_arg($a2),
+            crate::sys::IntoArg::into_arg($a3),
+            crate::sys::IntoArg::into_arg($a4),
+            crate::sys::IntoArg::into_arg($a5),
+            crate::sys::IntoArg::into_arg($a6),
+        ) }
+    };
 }
 pub(crate) use call;
