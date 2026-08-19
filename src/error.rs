@@ -70,12 +70,22 @@ pub(crate) trait SysResExt: Sized {
         }
     }
 
+    /// Checks for error, but use error implementing [`FromErrCode`].
+    fn e2<E: FromErrCode>(self) -> Result<(), E> {
+        match self.inner() {
+            Ok(_) => Ok(()),
+            Err(err) => Err(E::from_err_code(err)),
+        }
+    }
+
     /// Returns unsigned integer from success result.
     fn io<E: ErrorKind>(self, kind: E) -> Result<usize, E::Error> {
         self.inner().map_err(|e| kind.into_error(e))
     }
 
     /// Returns unsigned integer from success result.
+    ///
+    /// In contrast with [`SysResExt::io`], this uses error implementing [`FromErrCode`].
     fn io2<E: FromErrCode>(self) -> Result<usize, E> {
         self.inner().map_err(E::from_err_code)
     }

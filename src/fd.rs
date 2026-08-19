@@ -93,7 +93,7 @@ pub struct OwnedFd(ValidRawFd);
 impl Drop for OwnedFd {
     #[inline]
     fn drop(&mut self) {
-        unsafe { libc::close(self.0) };
+        crate::sys::call!(RD, __NR_close, self.0);
     }
 }
 

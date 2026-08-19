@@ -1,33 +1,39 @@
 use core::num::NonZeroI32;
 
-use crate::error::{ErrCode, FromErrCode, os_error_simple};
+use crate::error::{ErrCode, SysResExt, os_error_simple};
 use crate::signal::Signo;
+use crate::sys;
 
 /// Process handle.
 #[derive(Debug, Clone)]
 pub struct Process(NonZeroI32);
 
 impl Process {
-    /// Create [`Process`] referencing this process.
+    /// Create [`Process`] referencing caller process.
     #[inline]
     pub fn this() -> Self {
-        Self(unsafe { NonZeroI32::new_unchecked(libc::getpid()) })
+        let pid = sys::call!(RD, __NR_getpid).into_inner();
+        // SAFETY: have faith from the kernel
+        Self(unsafe { NonZeroI32::new_unchecked(pid as _) })
     }
 
-    /// Create [`Process`] referencing parent process.
+    /// Create [`Process`] referencing callers parent process.
     ///
     /// Returns `None` if parent is in a different PID namespace.
     #[inline]
     pub fn parent() -> Option<Self> {
-        NonZeroI32::new(unsafe { libc::getppid() }).map(Self)
+        let ppid = sys::call!(RD, __NR_getppid).into_inner();
+        NonZeroI32::new(ppid as _).map(Self)
     }
 
     /// Create child process by duplicating the calling process.
     ///
     /// Returns `None` if this execution is in the child process.
     #[inline]
-    pub fn fork() -> Option<Process> {
-        NonZeroI32::new(unsafe { libc::fork() }).map(Self)
+    pub fn fork() -> Result<Option<Process>, ForkError> {
+        sys::call!(RD, __NR_fork)
+            .io2()
+            .map(|pid| NonZeroI32::new(pid as _).map(Self))
     }
 
     /// Returns the process id.
@@ -39,11 +45,17 @@ impl Process {
     /// Send a signal to process this struct refers to.
     #[inline]
     pub fn kill(&self, sig: Signo) -> Result<(), KillError> {
-        unsafe { <_>::e(libc::kill(self.0.get(), sig.into())) }
+        sys::call!(RD, __NR_kill, self.0.get(), i32::from(sig)).e2()
     }
 }
 
 // ===== errors =====
+
+/// An error that may occur when `fork`-ing a process.
+#[derive(Clone, Copy)]
+pub struct ForkError(ErrCode);
+
+os_error_simple!(ForkError, "fork process");
 
 /// An error that may occur when sending signal to a process.
 #[derive(Clone, Copy)]

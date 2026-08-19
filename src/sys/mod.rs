@@ -27,8 +27,8 @@ macro_rules! call {
             crate::sys::IntoArg::into_arg($a1),
         ) }
     };
-    ($nr:ident) => {
-        unsafe { crate::sys::call0(crate::sys::$nr) }
+    (RD, $nr:ident) => {
+        unsafe { crate::sys::call0_rd(crate::sys::$nr) }
     };
     (RD, $nr:ident, $a1:expr) => {
         unsafe { crate::sys::call1_rd(crate::sys::$nr,

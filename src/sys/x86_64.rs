@@ -24,6 +24,19 @@ use crate::sys::{SysRes, shared};
 // More on Rust inline assembly: https://doc.rust-lang.org/reference/inline-assembly.html
 
 #[inline]
+pub(crate) unsafe fn call0_rd(nr: c_long) -> SysRes {
+    let ret;
+    asm!(
+        "syscall",
+        inlateout("rax") nr => ret,
+        lateout("rcx") _,
+        lateout("r11") _,
+        options(nostack, preserves_flags, readonly)
+    );
+    SysRes::new(ret)
+}
+
+#[inline]
 pub(crate) unsafe fn call1_rd(nr: c_long, a1: usize) -> SysRes {
     let ret;
     asm!(
