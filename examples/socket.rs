@@ -3,14 +3,14 @@
 use core::fmt;
 use core::mem::MaybeUninit;
 
+use genos::env::Args;
 use genos::error::AsErrCode;
 use genos::net::addr::SockaddrUn;
 use genos::net::socket::RecvFlags;
 use genos::net::{OpenFlag, Socket};
 use genos::println;
-use genos::process::Args;
 
-genos::main!(|args| start(args).is_err() as _);
+genos::main!(|args, _| start(args).is_err() as _);
 
 fn start(args: Args) -> Result<(), Error> {
     let path = args.iter().nth(1).ok_or("path argument required")?;

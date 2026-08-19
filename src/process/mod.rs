@@ -1,5 +1,4 @@
 //! Process management.
-pub use main::Args;
 pub use process::{KillError, Process};
 
 mod process;
