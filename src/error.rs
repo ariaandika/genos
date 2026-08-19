@@ -121,6 +121,8 @@ impl ErrCode {
     /// Creates [`ErrCode`] with code for invalid arguments.
     pub const EINVAL: Self = Self(NonZeroU8::new(EINVAL as _).unwrap());
 
+    pub(crate) const ENOMEM: Self = Self(NonZeroU8::new(ENOMEM as _).unwrap());
+
     /// Creates [`ErrCode`] with given error code.
     #[inline]
     pub fn new(code: i32) -> Self {
@@ -283,6 +285,7 @@ pub(crate) use impl_error_with_kind;
 
 const EINTR: i32 = 4; /* Interrupted system call */
 const EAGAIN: i32 = 11; /* Try again */
+const ENOMEM: i32 = 12; /* Out of memory */
 const EINVAL: i32 = 22; /* Invalid argument */
 
 // source: include/uapi/asm-generic/errno.h

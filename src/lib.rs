@@ -16,10 +16,10 @@ pub mod error;
 pub mod fd;
 pub mod flags;
 
-pub mod alloc;
 pub mod env;
 pub mod event;
 pub mod io;
+pub mod mem;
 pub mod net;
 pub mod process;
 pub mod rand;
