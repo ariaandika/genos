@@ -62,3 +62,22 @@ impl<T> IntoArg for *mut T {
         self as _
     }
 }
+
+// ===== SysRes =====
+
+/// Syscall result.
+///
+/// Wrapped to prevent missuse.
+pub(crate) struct SysRes(isize);
+
+impl SysRes {
+    /// Should only be created right after the syscall.
+    pub(super) fn new(ret: isize) -> Self {
+        Self(ret)
+    }
+
+    /// Should only be extracted by helper api.
+    pub(crate) fn into_inner(self) -> isize {
+        self.0
+    }
+}

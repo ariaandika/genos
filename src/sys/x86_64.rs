@@ -2,7 +2,7 @@
 use core::arch::asm;
 use core::ffi::c_long;
 
-use crate::sys::shared;
+use crate::sys::{SysRes, shared};
 
 // syscall arguments use register-sized types
 // syscall return values use register-sized types
@@ -24,7 +24,7 @@ use crate::sys::shared;
 // More on Rust inline assembly: https://doc.rust-lang.org/reference/inline-assembly.html
 
 #[inline]
-pub(crate) unsafe fn call1_rd(nr: c_long, a1: usize) -> isize {
+pub(crate) unsafe fn call1_rd(nr: c_long, a1: usize) -> SysRes {
     let ret;
     asm!(
         "syscall",
@@ -34,7 +34,7 @@ pub(crate) unsafe fn call1_rd(nr: c_long, a1: usize) -> isize {
         lateout("r11") _,
         options(nostack, preserves_flags, readonly)
     );
-    ret
+    SysRes::new(ret)
 }
 
 #[inline]
@@ -50,7 +50,7 @@ pub(crate) unsafe fn call1_noret(nr: c_long, a1: usize) -> ! {
 }
 
 #[inline]
-pub(crate) unsafe fn call2_rd(nr: c_long, a1: usize, a2: usize) -> isize {
+pub(crate) unsafe fn call2_rd(nr: c_long, a1: usize, a2: usize) -> SysRes {
     let ret;
     asm!(
         "syscall",
@@ -61,11 +61,11 @@ pub(crate) unsafe fn call2_rd(nr: c_long, a1: usize, a2: usize) -> isize {
         lateout("r11") _,
         options(nostack, preserves_flags, readonly)
     );
-    ret
+    SysRes::new(ret)
 }
 
 #[inline]
-pub(crate) unsafe fn call3(nr: c_long, a1: usize, a2: usize, a3: usize) -> isize {
+pub(crate) unsafe fn call3(nr: c_long, a1: usize, a2: usize, a3: usize) -> SysRes {
     let ret;
     asm!(
         "syscall",
@@ -77,11 +77,11 @@ pub(crate) unsafe fn call3(nr: c_long, a1: usize, a2: usize, a3: usize) -> isize
         lateout("r11") _,
         options(nostack, preserves_flags)
     );
-    ret
+    SysRes::new(ret)
 }
 
 #[inline]
-pub(crate) unsafe fn call3_rd(nr: c_long, a1: usize, a2: usize, a3: usize) -> isize {
+pub(crate) unsafe fn call3_rd(nr: c_long, a1: usize, a2: usize, a3: usize) -> SysRes {
     let ret;
     asm!(
         "syscall",
@@ -93,11 +93,11 @@ pub(crate) unsafe fn call3_rd(nr: c_long, a1: usize, a2: usize, a3: usize) -> is
         lateout("r11") _,
         options(nostack, preserves_flags, readonly)
     );
-    ret
+    SysRes::new(ret)
 }
 
 #[inline]
-pub(crate) unsafe fn call4(nr: c_long, a1: usize, a2: usize, a3: usize, a4: usize) -> isize {
+pub(crate) unsafe fn call4(nr: c_long, a1: usize, a2: usize, a3: usize, a4: usize) -> SysRes {
     let ret;
     asm!(
         "syscall",
@@ -110,11 +110,11 @@ pub(crate) unsafe fn call4(nr: c_long, a1: usize, a2: usize, a3: usize, a4: usiz
         lateout("r11") _,
         options(nostack, preserves_flags)
     );
-    ret
+    SysRes::new(ret)
 }
 
 #[inline]
-pub(crate) unsafe fn call4_rd(nr: c_long, a1: usize, a2: usize, a3: usize, a4: usize) -> isize {
+pub(crate) unsafe fn call4_rd(nr: c_long, a1: usize, a2: usize, a3: usize, a4: usize) -> SysRes {
     let ret;
     asm!(
         "syscall",
@@ -127,7 +127,7 @@ pub(crate) unsafe fn call4_rd(nr: c_long, a1: usize, a2: usize, a3: usize, a4: u
         lateout("r11") _,
         options(nostack, preserves_flags, readonly)
     );
-    ret
+    SysRes::new(ret)
 }
 
 #[inline]
@@ -139,7 +139,7 @@ pub(crate) unsafe fn call6(
     a4: usize,
     a5: usize,
     a6: usize,
-) -> isize {
+) -> SysRes {
     let ret;
     asm!(
         "syscall",
@@ -154,7 +154,7 @@ pub(crate) unsafe fn call6(
         lateout("r11") _,
         options(nostack, preserves_flags)
     );
-    ret
+    SysRes::new(ret)
 }
 
 #[inline]
@@ -166,7 +166,7 @@ pub(crate) unsafe fn call6_rd(
     a4: usize,
     a5: usize,
     a6: usize,
-) -> isize {
+) -> SysRes {
     let ret;
     asm!(
         "syscall",
@@ -181,7 +181,7 @@ pub(crate) unsafe fn call6_rd(
         lateout("r11") _,
         options(nostack, preserves_flags, readonly)
     );
-    ret
+    SysRes::new(ret)
 }
 
 // Roughly speaking, the code belonging to the system call with

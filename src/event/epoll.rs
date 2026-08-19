@@ -1,12 +1,10 @@
 //! Linux epoll interface.
 use core::mem::MaybeUninit;
-use core::{error, fmt, result};
+use core::{fmt, result};
 
-use crate::error::{AsErrCode, ErrCode};
-use crate::fd::{AsFd, FromRawFd, OwnedFd, impl_fd_simple};
-use crate::flags::impl_bitops_simple;
-use crate::net::OpenFlag;
-use crate::sys;
+use crate::error::{AsErrCode, ErrCode, SysResExt};
+use crate::fd::{AsFd, OwnedFd};
+use crate::{error, fd, flags, sys};
 
 // ===== Epoll =====
 
@@ -14,13 +12,13 @@ use crate::sys;
 #[derive(Debug)]
 pub struct Epoll(OwnedFd);
 
-impl_fd_simple!(Epoll);
+fd::impl_fd_simple!(Epoll);
 
 impl Epoll {
     /// Creates new [`Epoll`].
     #[inline]
     pub fn create(flags: Flags) -> Result<Self> {
-        fd(sys::call!(RD, __NR_epoll_create1, flags.0), Kind::Create)
+        sys::call!(RD, __NR_epoll_create1, flags.0).fd(Kind::Create)
     }
 
     /// Add an entry to the interest list.
@@ -30,7 +28,7 @@ impl Epoll {
     pub fn add<Fd: AsFd>(&self, fd: &Fd, events: EventType, data: u64) -> Result<()> {
         const OP: i32 = EPOLL_CTL_ADD;
         let event = Event { events, data };
-        e(sys::call!(RD, __NR_epoll_ctl, self.as_fd(), OP, fd.as_fd(), &event), Kind::Add)
+        sys::call!(RD, __NR_epoll_ctl, self.as_fd(), OP, fd.as_fd(), &event).e(Kind::Add)
     }
 
     /// Change the settings associated with fd in the interest list.
@@ -40,14 +38,14 @@ impl Epoll {
     pub fn modify<Fd: AsFd>(&self, fd: &Fd, events: EventType, data: u64) -> Result<()> {
         const OP: i32 = EPOLL_CTL_MOD;
         let event = Event { events, data };
-        e(sys::call!(RD, __NR_epoll_ctl, self.as_fd(), OP, fd.as_fd(), &event), Kind::Mod)
+        sys::call!(RD, __NR_epoll_ctl, self.as_fd(), OP, fd.as_fd(), &event).e(Kind::Mod)
     }
 
     /// Remove (deregister) the target fd from the interest list.
     #[inline]
     pub fn delete<Fd: AsFd>(&self, fd: &Fd) -> Result<()> {
         const OP: i32 = EPOLL_CTL_DEL;
-        e(sys::call!(RD, __NR_epoll_ctl, self.as_fd(), OP, fd.as_fd(), 0), Kind::Del)
+        sys::call!(RD, __NR_epoll_ctl, self.as_fd(), OP, fd.as_fd(), 0).e(Kind::Del)
     }
 }
 
@@ -76,13 +74,13 @@ impl Epoll {
     #[inline]
     pub fn wait(&self, buf: &mut [MaybeUninit<Event>], timeout: i32) -> Result<usize> {
         let res = sys::call!(__NR_epoll_wait, self.as_fd(), &mut *buf, buf.len(), timeout);
-        match res.try_into() {
+        match res.io(Kind::Wait) {
             Ok(len) => Ok(len),
-            Err(_) => {
-                if ErrCode::new(res as _).is_interrupt() {
+            Err(err) => {
+                if err.is_interrupt() {
                     Ok(0)
                 } else {
-                    Err(Error::new(Kind::Wait, res))
+                    Err(err)
                 }
             }
         }
@@ -111,14 +109,14 @@ pub struct Event {
 #[repr(transparent)]
 pub struct Flags(i32);
 
-impl_bitops_simple!(Flags);
+flags::impl_bitops_simple!(Flags);
 
 impl Flags {
     /// Set the close-on-exec (FD_CLOEXEC) flag on the new fd.
     pub const CLOEXEC: Self = Self(EPOLL_CLOEXEC);
 }
 
-impl OpenFlag for Flags {
+impl flags::OpenFlag for Flags {
     const CLOEXEC: Self = Self::CLOEXEC;
     /// Epoll does not have non-blocking mode.
     const NONBLOCK: Self = Self(0);
@@ -131,8 +129,8 @@ impl OpenFlag for Flags {
 #[repr(transparent)]
 pub struct EventType(u32);
 
-impl_bitops_simple!(EventType);
-impl_bitops_simple!(EventType, InputFlags);
+flags::impl_bitops_simple!(EventType);
+flags::impl_bitops_simple!(EventType, InputFlags);
 
 impl EventType {
     /// The associated file is available for `read` operations.
@@ -239,20 +237,6 @@ impl InputFlags {
 
 // ===== errors =====
 
-fn fd<T: FromRawFd>(res: isize, kind: Kind) -> Result<T> {
-    if res.is_negative() {
-        return Err(Error::new(kind, res));
-    }
-    Ok(unsafe { T::from_raw_fd(res as _) })
-}
-
-fn e(res: isize, kind: Kind) -> Result<()> {
-    if res.is_negative() {
-        return Err(Error::new(kind, res));
-    }
-    Ok(())
-}
-
 /// Type alias for result of [`Epoll`] operations.
 pub type Result<T> = result::Result<T, Error>;
 
@@ -272,27 +256,7 @@ enum Kind {
     Wait,
 }
 
-impl Error {
-    fn new(kind: Kind, code: isize) -> Self {
-        Self { kind, code: ErrCode::new(code as _) }
-    }
-}
-
-impl From<Error> for ErrCode {
-    #[inline]
-    fn from(value: Error) -> Self {
-        value.code
-    }
-}
-
-impl AsErrCode for Error {
-    #[inline]
-    fn as_err_code(&self) -> ErrCode {
-        self.code
-    }
-}
-
-impl error::Error for Error {}
+error::impl_error_with_kind!(Error, Kind);
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

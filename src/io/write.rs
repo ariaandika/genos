@@ -1,8 +1,6 @@
-use core::error;
-
-use crate::error::{ErrCode, FromErrCode, impl_error_os_simple};
+use crate::error::{ErrCode, SysResExt};
 use crate::fd::AsFd;
-use crate::sys;
+use crate::{error, sys};
 
 /// A writable file descriptor.
 pub trait Write: AsFd {
@@ -18,8 +16,9 @@ pub trait Write: AsFd {
     /// or the call was interrupted by a signal handler after having written less than count bytes.
     #[inline]
     fn write(&self, buf: &[u8]) -> Result<usize, Self::Error> {
-        let res = sys::call!(RD, __NR_write, self.as_fd(), buf, buf.len());
-        WriteError::es(res).map_err(<_>::into)
+        sys::call!(RD, __NR_write, self.as_fd(), buf, buf.len())
+            .io2::<WriteError>()
+            .map_err(<_>::into)
     }
 }
 
@@ -27,4 +26,4 @@ pub trait Write: AsFd {
 #[derive(Clone, Copy)]
 pub struct WriteError(ErrCode);
 
-impl_error_os_simple!(WriteError, "write to fd");
+error::impl_error_os_simple!(WriteError, "write to fd");

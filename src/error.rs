@@ -1,6 +1,10 @@
 //! Error types.
+pub use core::error::Error;
 use core::num::NonZeroU8;
-use core::{error, ffi, fmt};
+use core::{ffi, fmt};
+
+use crate::fd::FromRawFd;
+use crate::sys::SysRes;
 
 // ===== traits =====
 
@@ -23,15 +27,6 @@ pub(crate) trait FromErrCode: Sized {
         }
         Ok(T::from_ok_code(res as _))
     }
-
-    /// Convert result from syscall.
-    #[inline]
-    fn es<T: FromOkCode>(res: isize) -> Result<T, Self> {
-        match usize::try_from(res) {
-            Ok(ok) => Ok(<_>::from_ok_code(ok)),
-            Err(_) => Err(<_>::from_err_code(ErrCode::new(res.wrapping_neg() as _))),
-        }
-    }
 }
 
 pub(crate) trait FromOkCode {
@@ -48,12 +43,62 @@ impl FromOkCode for () {
     fn from_ok_code(_: usize) -> Self {}
 }
 
+/// Descriptor trait for error pattern that contains error kind and code.
+pub(crate) trait ErrorKind {
+    type Error;
+
+    fn into_error(self, code: ErrCode) -> Self::Error;
+}
+
+/// Extensions trait for converting syscall result.
+pub(crate) trait SysResExt: Sized {
+    fn inner(self) -> Result<usize, ErrCode>;
+
+    /// Creates file descriptor from success result.
+    fn fd<T: FromRawFd, E: ErrorKind>(self, kind: E) -> Result<T, E::Error> {
+        match self.inner() {
+            Ok(ok) => Ok(unsafe { T::from_raw_fd(ok as _) }),
+            Err(err) => Err(kind.into_error(err)),
+        }
+    }
+
+    /// Checks for error.
+    fn e<E: ErrorKind>(self, kind: E) -> Result<(), E::Error> {
+        match self.inner() {
+            Ok(_) => Ok(()),
+            Err(err) => Err(kind.into_error(err)),
+        }
+    }
+
+    /// Returns unsigned integer from success result.
+    fn io<E: ErrorKind>(self, kind: E) -> Result<usize, E::Error> {
+        self.inner().map_err(|e| kind.into_error(e))
+    }
+
+    /// Returns unsigned integer from success result.
+    fn io2<E: FromErrCode>(self) -> Result<usize, E> {
+        self.inner().map_err(E::from_err_code)
+    }
+}
+
+impl SysResExt for SysRes {
+    fn inner(self) -> Result<usize, ErrCode> {
+        let r = self.into_inner();
+        usize::try_from(r).map_err(|_| ErrCode::sys(r))
+    }
+}
+
 // ===== AsErrCode =====
 
 /// An error that is associated with [`ErrCode`].
 pub trait AsErrCode {
     /// Returns the contained [`ErrCode`].
     fn as_err_code(&self) -> ErrCode;
+
+    /// Returns `true` if the contained error code is `EINTR`.
+    fn is_interrupt(&self) -> bool {
+        self.as_err_code().is_interrupt()
+    }
 }
 
 // ===== ErrCode =====
@@ -67,6 +112,11 @@ impl ErrCode {
     #[inline]
     pub fn new(code: i32) -> Self {
         Self(NonZeroU8::new(code as _).unwrap_or(NonZeroU8::MAX))
+    }
+
+    /// Extract error code from syscall result.
+    fn sys(code: isize) -> Self {
+        Self(NonZeroU8::new((code as u8).wrapping_neg()).unwrap_or(NonZeroU8::MAX))
     }
 
     /// Creates [`ErrCode`] with value retrieved from `errno`.
@@ -102,7 +152,7 @@ impl ErrCode {
 
 // ===== core traits =====
 
-impl error::Error for ErrCode {}
+impl Error for ErrCode {}
 
 impl fmt::Display for ErrCode {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -187,3 +237,30 @@ macro_rules! os_error_simple {
 pub(crate) use os_error_simple;
 #[allow(unused_imports)]
 pub(crate) use os_error_simple as impl_error_os_simple;
+
+/// Helper macro to declare error pattern that contains error kind and code.
+macro_rules! impl_error_with_kind {
+    ($err:ident, $kind:ident) => {
+        impl crate::error::Error for $err {}
+        impl crate::error::ErrorKind for $kind {
+            type Error = $err;
+
+            fn into_error(self, code: crate::error::ErrCode) -> Self::Error {
+                $err { kind: self, code }
+            }
+        }
+        impl From<$err> for crate::error::ErrCode {
+            #[inline]
+            fn from(value: $err) -> Self {
+                value.code
+            }
+        }
+        impl crate::error::AsErrCode for $err {
+            #[inline]
+            fn as_err_code(&self) -> crate::error::ErrCode {
+                self.code
+            }
+        }
+    };
+}
+pub(crate) use impl_error_with_kind;

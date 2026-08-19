@@ -1,9 +1,8 @@
-use core::error;
 use core::mem::MaybeUninit;
 
-use crate::error::{ErrCode, FromErrCode, impl_error_os_simple};
+use crate::error::{ErrCode, SysResExt};
 use crate::fd::AsFd;
-use crate::sys;
+use crate::{error, sys};
 
 /// A readable file descriptor.
 pub trait Read: AsFd {
@@ -21,8 +20,9 @@ pub trait Read: AsFd {
     /// interrupted by a signal.
     #[inline]
     fn read(&self, buf: &mut [MaybeUninit<u8>]) -> Result<usize, Self::Error> {
-        let res = sys::call!(__NR_read, self.as_fd(), &mut *buf, buf.len());
-        ReadError::es(res).map_err(<_>::into)
+        sys::call!(__NR_read, self.as_fd(), &mut *buf, buf.len())
+            .io2::<ReadError>()
+            .map_err(<_>::into)
     }
 }
 
@@ -30,4 +30,4 @@ pub trait Read: AsFd {
 #[derive(Clone, Copy)]
 pub struct ReadError(ErrCode);
 
-impl_error_os_simple!(ReadError, "read from fd");
+error::impl_error_os_simple!(ReadError, "read from fd");
