@@ -1,8 +1,8 @@
 use core::num::NonZeroI32;
 
-use crate::error::{ErrCode, SysResExt, os_error_simple};
+use crate::error::{ErrCode, SysResExt};
 use crate::signal::Signo;
-use crate::sys;
+use crate::{error, sys};
 
 /// Process handle.
 #[derive(Debug, Clone)]
@@ -55,10 +55,10 @@ impl Process {
 #[derive(Clone, Copy)]
 pub struct ForkError(ErrCode);
 
-os_error_simple!(ForkError, "fork process");
+error::impl_error_os_simple!(ForkError, "fork process");
 
 /// An error that may occur when sending signal to a process.
 #[derive(Clone, Copy)]
 pub struct KillError(ErrCode);
 
-os_error_simple!(KillError, "send signal to process");
+error::impl_error_os_simple!(KillError, "send signal to process");
