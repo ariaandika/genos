@@ -2,7 +2,7 @@
 use core::arch::asm;
 use core::ffi::{self, c_long, c_ulong};
 
-use crate::sys::{SysRes, shared};
+use crate::sys::SysRes;
 
 // syscall arguments use register-sized types
 // syscall return values use register-sized types
@@ -24,6 +24,7 @@ use crate::sys::{SysRes, shared};
 // More on Rust inline assembly: https://doc.rust-lang.org/reference/inline-assembly.html
 
 #[inline]
+#[doc(hidden)]
 pub(crate) unsafe fn call0_rd(nr: c_long) -> SysRes {
     let ret;
     asm!(
@@ -37,6 +38,7 @@ pub(crate) unsafe fn call0_rd(nr: c_long) -> SysRes {
 }
 
 #[inline]
+#[doc(hidden)]
 pub(crate) unsafe fn call1_rd(nr: c_long, a1: usize) -> SysRes {
     let ret;
     asm!(
@@ -51,8 +53,10 @@ pub(crate) unsafe fn call1_rd(nr: c_long, a1: usize) -> SysRes {
 }
 
 #[inline]
+#[doc(hidden)]
 pub(crate) unsafe fn call1_noret(nr: c_long, a1: usize) -> ! {
     // [ud2]: <https://doc.rust-lang.org/reference/inline-assembly.html#r-asm.options.supported-options.noreturn>
+    // #[doc(hidden)]
     asm!(
         "syscall",
         "ud2",
@@ -63,6 +67,7 @@ pub(crate) unsafe fn call1_noret(nr: c_long, a1: usize) -> ! {
 }
 
 #[inline]
+#[doc(hidden)]
 pub(crate) unsafe fn call2(nr: c_long, a1: usize, a2: usize) -> SysRes {
     let ret;
     asm!(
@@ -78,6 +83,7 @@ pub(crate) unsafe fn call2(nr: c_long, a1: usize, a2: usize) -> SysRes {
 }
 
 #[inline]
+#[doc(hidden)]
 pub(crate) unsafe fn call2_rd(nr: c_long, a1: usize, a2: usize) -> SysRes {
     let ret;
     asm!(
@@ -93,6 +99,7 @@ pub(crate) unsafe fn call2_rd(nr: c_long, a1: usize, a2: usize) -> SysRes {
 }
 
 #[inline]
+#[doc(hidden)]
 pub(crate) unsafe fn call3(nr: c_long, a1: usize, a2: usize, a3: usize) -> SysRes {
     let ret;
     asm!(
@@ -109,6 +116,7 @@ pub(crate) unsafe fn call3(nr: c_long, a1: usize, a2: usize, a3: usize) -> SysRe
 }
 
 #[inline]
+#[doc(hidden)]
 pub(crate) unsafe fn call3_rd(nr: c_long, a1: usize, a2: usize, a3: usize) -> SysRes {
     let ret;
     asm!(
@@ -125,6 +133,7 @@ pub(crate) unsafe fn call3_rd(nr: c_long, a1: usize, a2: usize, a3: usize) -> Sy
 }
 
 #[inline]
+#[doc(hidden)]
 pub(crate) unsafe fn call4(nr: c_long, a1: usize, a2: usize, a3: usize, a4: usize) -> SysRes {
     let ret;
     asm!(
@@ -142,6 +151,7 @@ pub(crate) unsafe fn call4(nr: c_long, a1: usize, a2: usize, a3: usize, a4: usiz
 }
 
 #[inline]
+#[doc(hidden)]
 pub(crate) unsafe fn call4_rd(nr: c_long, a1: usize, a2: usize, a3: usize, a4: usize) -> SysRes {
     let ret;
     asm!(
@@ -159,6 +169,7 @@ pub(crate) unsafe fn call4_rd(nr: c_long, a1: usize, a2: usize, a3: usize, a4: u
 }
 
 #[inline]
+#[doc(hidden)]
 pub(crate) unsafe fn call6(
     nr: c_long,
     a1: usize,
@@ -186,6 +197,7 @@ pub(crate) unsafe fn call6(
 }
 
 #[inline]
+#[doc(hidden)]
 pub(crate) unsafe fn call6_rd(
     nr: c_long,
     a1: usize,
@@ -212,7 +224,7 @@ pub(crate) unsafe fn call6_rd(
     SysRes::new(ret)
 }
 
-pub use shared::*;
+pub use crate::sys::asm_generic::*;
 
 // Roughly speaking, the code belonging to the system call with
 // number __NR_xxx defined in /usr/include/asm/unistd.h can be found

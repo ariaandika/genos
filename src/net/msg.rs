@@ -1,8 +1,8 @@
 //! Socket message.
 use core::{ffi, marker};
 
-use crate::net::addr::socklen_t;
 use crate::net::iovec::IoVecMut;
+use crate::sys;
 
 // ===== AncillaryData =====
 
@@ -57,11 +57,12 @@ impl<'io, 'ct> MsgHdr<'io, 'ct> {
 
 // ===== extern =====
 
+/// source: `recv(2)`
 #[derive(Debug)]
 #[repr(C)]
 pub(crate) struct msghdr {
     pub msg_name: *mut ffi::c_void,
-    pub msg_namelen: socklen_t,
+    pub msg_namelen: sys::socklen_t,
     pub msg_iov: *mut ffi::c_void, // *mut iovec
     pub msg_iovlen: usize,
     pub msg_control: *mut ffi::c_void,

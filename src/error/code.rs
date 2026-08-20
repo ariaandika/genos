@@ -2,6 +2,8 @@ use core::error::Error;
 use core::num::NonZeroU8;
 use core::{ffi, fmt};
 
+use crate::sys;
+
 // ===== ErrCode =====
 
 /// Error Code.
@@ -10,9 +12,9 @@ pub struct ErrCode(NonZeroU8);
 
 impl ErrCode {
     /// Creates [`ErrCode`] with code for invalid arguments.
-    pub const EINVAL: Self = Self(NonZeroU8::new(EINVAL as _).unwrap());
+    pub const EINVAL: Self = Self(NonZeroU8::new(sys::EINVAL as _).unwrap());
 
-    pub(crate) const ENOMEM: Self = Self(NonZeroU8::new(ENOMEM as _).unwrap());
+    pub(crate) const ENOMEM: Self = Self(NonZeroU8::new(sys::ENOMEM as _).unwrap());
 
     /// Creates [`ErrCode`] with given error code.
     #[inline]
@@ -46,13 +48,13 @@ impl ErrCode {
     /// Returns `true` if error code is `EINTR`.
     #[inline]
     pub fn is_interrupt(self) -> bool {
-        matches!(self.code(), EINTR)
+        matches!(self.code(), sys::EINTR)
     }
 
-    /// Returns `true` if error code is `EWOULDBLOCK` or `EAGAIN`.
+    /// Returns `true` if error code is `EWOULDBLOCK`.
     #[inline]
     pub fn would_block(self) -> bool {
-        matches!(self.code(), EWOULDBLOCK)
+        matches!(self.code(), sys::EWOULDBLOCK)
     }
 }
 
@@ -94,17 +96,6 @@ fn fmt_lossy(cstr: &ffi::CStr, f: &mut fmt::Formatter<'_>) -> fmt::Result {
 }
 
 // ===== extern =====
-
-// source: include/uapi/asm-generic/errno-base.h
-
-const EINTR: i32 = 4; /* Interrupted system call */
-const EAGAIN: i32 = 11; /* Try again */
-const ENOMEM: i32 = 12; /* Out of memory */
-const EINVAL: i32 = 22; /* Invalid argument */
-
-// source: include/uapi/asm-generic/errno.h
-
-const EWOULDBLOCK: i32 = EAGAIN; /* Operation would block */
 
 unsafe extern "C" {
     #[link_name = "__xpg_strerror_r"]

@@ -2,6 +2,8 @@
 use core::ffi::CStr;
 use core::{error, ffi, fmt, mem};
 
+use crate::sys;
+
 // ===== SockAddr =====
 
 /// A socket address.
@@ -9,7 +11,7 @@ pub trait SockAddr: sealed::Sealed {}
 mod sealed {
     pub trait Sealed: Sized {
         type Raw;
-        fn as_raw(&self) -> (&Self::Raw, super::socklen_t);
+        fn as_raw(&self) -> (&Self::Raw, super::sys::socklen_t);
         fn from_raw(raw: Self::Raw, len: u32) -> Result<Self, super::AddrError>;
     }
 }
@@ -17,22 +19,23 @@ mod sealed {
 // ===== Family =====
 
 /// Socket address family.
+///
+/// See `address_families(7)`.
 #[derive(Debug, Clone, Copy)]
 #[repr(transparent)]
 pub struct Family(i32);
 
-// `address_families(7)`
 impl Family {
     /// Local communication.
     ///
     /// See `unix(7)`.
-    pub const UNIX: Self = Self(AF_UNIX);
+    pub const UNIX: Self = Self(sys::AF_UNIX);
     /// Synonym for [`Family::LOCAL`].
-    pub const LOCAL: Self = Self(AF_LOCAL);
+    pub const LOCAL: Self = Self(sys::AF_LOCAL);
     /// IPv4 Internet protocols.
     ///
     /// See `ip(7)`.
-    pub const INET: Self = Self(AF_INET);
+    pub const INET: Self = Self(sys::AF_INET);
 }
 
 impl From<Family> for i32 {
@@ -58,7 +61,7 @@ impl SockaddrUn {
     #[inline]
     pub const fn from_path(path: &CStr) -> Result<Self, AddrError> {
         let mut addr = unsafe { mem::zeroed::<sockaddr_un>() };
-        addr.sun_family = AF_UNIX as _;
+        addr.sun_family = Family::UNIX.0 as _;
         let path = path.to_bytes_with_nul();
         if path.len() > addr.sun_path.len() {
             return Err(AddrError::ExcessivePath);
@@ -98,7 +101,7 @@ impl sealed::Sealed for SockaddrUn {
     type Raw = sockaddr_un;
 
     #[inline]
-    fn as_raw(&self) -> (&Self::Raw, socklen_t) {
+    fn as_raw(&self) -> (&Self::Raw, sys::socklen_t) {
         (&self.addr, self.len)
     }
 
@@ -106,7 +109,7 @@ impl sealed::Sealed for SockaddrUn {
     fn from_raw(addr: Self::Raw, mut len: u32) -> Result<Self, AddrError> {
         if len == 0 {
             len = SUN_PATH_OFFSET as _;
-        } else if addr.sun_family != AF_UNIX as _ {
+        } else if addr.sun_family != Family::UNIX.0 as _ {
             return Err(AddrError::MissmatchFamily);
         }
         Ok(Self { addr, len })
@@ -138,28 +141,10 @@ impl fmt::Display for AddrError {
 
 // ===== extern =====
 
-// Describes the length of a socket address. This is an integer type of at least 32 bits.
-// `sockaddr(3type)`
-#[allow(non_camel_case_types)]
-pub(crate) type socklen_t = u32;
-
-// source: include/linux/socket.h
-
-const AF_UNIX: i32 = 1;
-const AF_LOCAL: i32 = 1;
-const AF_INET: i32 = 2;
-
-// source: include/uapi/linux/un.h
-
-#[allow(non_camel_case_types)]
-type __kernel_sa_family_t = ffi::c_ushort;
-
-const UNIX_PATH_MAX: usize = 108;
-
 /// Raw type for UNIX socket address.
 #[derive(Debug)]
 #[repr(C)]
 pub struct sockaddr_un {
-    sun_family: __kernel_sa_family_t,
-    sun_path: [ffi::c_char; UNIX_PATH_MAX],
+    sun_family: sys::__kernel_sa_family_t,
+    sun_path: [ffi::c_char; sys::UNIX_PATH_MAX],
 }

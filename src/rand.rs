@@ -23,15 +23,15 @@ impl Flags {
     /// noise. If the number of available bytes in the random source is less than requested in size,
     /// the call returns just the avail‐ able random bytes. If no random bytes are available, the
     /// behavior depends on the presence of [`Flags::NONBLOCK`] in the flags argument.
-    pub const RANDOM: Self = Self(GRND_RANDOM);
+    pub const RANDOM: Self = Self(sys::GRND_RANDOM);
     /// Do not block, but instead immediately returns EAGAIN error.
     ///
     /// By default, when reading from the random source, [`rand`] blocks if no random bytes are
     /// available, and when reading from the urandom source, it blocks if the entropy pool has not
     /// yet been initialized.
-    pub const NONBLOCK: Self = Self(GRND_NONBLOCK);
+    pub const NONBLOCK: Self = Self(sys::GRND_NONBLOCK);
     /// Return non-cryptographic random bytes.
-    pub const INSECURE: Self = Self(GRND_INSECURE);
+    pub const INSECURE: Self = Self(sys::GRND_INSECURE);
 }
 
 flags::impl_bitops_simple!(Flags);
@@ -43,11 +43,3 @@ flags::impl_bitops_simple!(Flags);
 pub struct Error(ErrCode);
 
 error::impl_error_os_simple!(Error, "get random number");
-
-// ===== extern =====
-
-// source: include/uapi/linux/random.h
-
-const GRND_NONBLOCK: u32 = 0x0001;
-const GRND_RANDOM: u32 = 0x0002;
-const GRND_INSECURE: u32 = 0x0004;

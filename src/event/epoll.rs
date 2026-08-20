@@ -1,4 +1,4 @@
-//! Linux epoll interface.
+//! [`Epoll`] associated types.
 use core::mem::MaybeUninit;
 use core::{fmt, result};
 
@@ -26,7 +26,7 @@ impl Epoll {
     /// [`InputFlags`] can be added by `OR`-ing with [`EventType`].
     #[inline]
     pub fn add<Fd: AsFd>(&self, fd: &Fd, events: EventType, data: u64) -> Result<()> {
-        const OP: i32 = EPOLL_CTL_ADD;
+        const OP: i32 = sys::EPOLL_CTL_ADD;
         let event = Event { events, data };
         sys::call!(RD, __NR_epoll_ctl, self.as_fd(), OP, fd.as_fd(), &event).e(Kind::Add)
     }
@@ -36,7 +36,7 @@ impl Epoll {
     /// [`InputFlags`] can be added by `OR`-ing with [`EventType`].
     #[inline]
     pub fn modify<Fd: AsFd>(&self, fd: &Fd, events: EventType, data: u64) -> Result<()> {
-        const OP: i32 = EPOLL_CTL_MOD;
+        const OP: i32 = sys::EPOLL_CTL_MOD;
         let event = Event { events, data };
         sys::call!(RD, __NR_epoll_ctl, self.as_fd(), OP, fd.as_fd(), &event).e(Kind::Mod)
     }
@@ -44,7 +44,7 @@ impl Epoll {
     /// Remove (deregister) the target fd from the interest list.
     #[inline]
     pub fn delete<Fd: AsFd>(&self, fd: &Fd) -> Result<()> {
-        const OP: i32 = EPOLL_CTL_DEL;
+        const OP: i32 = sys::EPOLL_CTL_DEL;
         sys::call!(RD, __NR_epoll_ctl, self.as_fd(), OP, fd.as_fd(), 0).e(Kind::Del)
     }
 }
@@ -79,9 +79,8 @@ impl Epoll {
 
 // ===== EpollEvent =====
 
-// same as `epoll_event`, see below
-
 /// [`Epoll`] event.
+// with repr equivalen to `epoll_event`
 #[derive(Debug, Default, Clone)]
 #[repr(C, packed)]
 pub struct Event {
@@ -103,7 +102,7 @@ flags::impl_bitops_simple!(Flags);
 
 impl Flags {
     /// Set the close-on-exec (FD_CLOEXEC) flag on the new fd.
-    pub const CLOEXEC: Self = Self(EPOLL_CLOEXEC);
+    pub const CLOEXEC: Self = Self(sys::EPOLL_CLOEXEC);
 }
 
 impl flags::OpenFlag for Flags {
@@ -124,26 +123,26 @@ flags::impl_bitops_simple!(EventType, InputFlags);
 
 impl EventType {
     /// The associated file is available for `read` operations.
-    pub const IN: Self = Self(EPOLLIN);
+    pub const IN: Self = Self(sys::EPOLLIN);
     /// There is an exceptional condition on the file descriptor.
-    pub const PRI: Self = Self(EPOLLPRI);
+    pub const PRI: Self = Self(sys::EPOLLPRI);
     /// The associated file is available for `write` operations.
-    pub const OUT: Self = Self(EPOLLOUT);
+    pub const OUT: Self = Self(sys::EPOLLOUT);
     /// Error condition happened on the associated file descriptor.
     ///
     /// [`Epoll::wait`] will always report for this event; it is not necessary to set it in
     /// [`Event::events`].
-    pub const ERR: Self = Self(EPOLLERR);
+    pub const ERR: Self = Self(sys::EPOLLERR);
     /// Hang up happened on the associated file descriptor.
     ///
     /// [`Epoll::wait`] will always report for this event; it is not necessary to set it in
     /// [`Event::events`].
-    pub const HUP: Self = Self(EPOLLHUP);
+    pub const HUP: Self = Self(sys::EPOLLHUP);
     /// Stream socket peer closed connection, or shut down writing half of connection.
     ///
     /// This flag is especially useful for writing simple code to detect peer shutdown when using
     /// edge-triggered monitoring.
-    pub const RDHUP: Self = Self(EPOLLRDHUP);
+    pub const RDHUP: Self = Self(sys::EPOLLRDHUP);
 
     /// Returns `true` if events contains [`EventType::IN`].
     #[inline]
@@ -198,7 +197,7 @@ impl InputFlags {
     /// then a subsequent [`Epoll::modify`] on the same epfd, fd pair yields an error. Specifying
     /// [`InputFlags::EXCLUSIVE`] in events and specifies the target fd as an epoll instance will
     /// likewise fail. The error in all of these cases is `EINVAL`.
-    pub const EXCLUSIVE: Self = Self(EPOLLEXCLUSIVE);
+    pub const EXCLUSIVE: Self = Self(sys::EPOLLEXCLUSIVE);
 
     /// If [`InputFlags::ONESHOT`] and [`InputFlags::ET`] are clear and the process has the
     /// CAP_BLOCK_SUSPEND capability, ensure that the system does not enter "suspend" or "hibernate"
@@ -209,7 +208,7 @@ impl InputFlags {
     /// descriptor, the closure of that file descriptor, the removal of the event file descriptor
     /// with [`Epoll::delete`], or the clearing of [`InputFlags::WAKEUP`] for the event file
     /// descriptor with [`Epoll::modify`]. See also BUGS.
-    pub const WAKEUP: Self = Self(EPOLLWAKEUP);
+    pub const WAKEUP: Self = Self(sys::EPOLLWAKEUP);
 
     /// Requests one-shot notification for the associated file descriptor.
     ///
@@ -217,12 +216,12 @@ impl InputFlags {
     /// descriptor is disabled in the interest list and no other events will be reported by the
     /// epoll interface. The user must call [`Epoll::modify`] to rearm the file descriptor with a
     /// new event mask.
-    pub const ONESHOT: Self = Self(EPOLLONESHOT);
+    pub const ONESHOT: Self = Self(sys::EPOLLONESHOT);
 
     /// Requests edge-triggered notification for the associated file descriptor.
     ///
     /// The default behavior for epoll is level-triggered.
-    pub const ET: Self = Self(EPOLLET);
+    pub const ET: Self = Self(sys::EPOLLET);
 }
 
 // ===== errors =====
@@ -261,55 +260,3 @@ impl fmt::Display for Error {
         write!(f, "failed to {msg}: {code}")
     }
 }
-
-// ===== extern =====
-// include/uapi/linux/eventpoll.h
-
-const EPOLL_CLOEXEC: i32 = sys::O_CLOEXEC;
-
-const EPOLL_CTL_ADD: i32 = 1;
-const EPOLL_CTL_DEL: i32 = 2;
-const EPOLL_CTL_MOD: i32 = 3;
-
-// note: here the flags uses `u32` to match the other flags that uses `1U`
-
-const EPOLLIN: u32 = 0x00000001;
-const EPOLLPRI: u32 = 0x00000002;
-const EPOLLOUT: u32 = 0x00000004;
-const EPOLLERR: u32 = 0x00000008;
-const EPOLLHUP: u32 = 0x00000010;
-// const EPOLLNVAL: u32 = 0x00000020;
-// const EPOLLRDNORM: u32 = 0x00000040;
-// const EPOLLRDBAND: u32 = 0x00000080;
-// const EPOLLWRNORM: u32 = 0x00000100;
-// const EPOLLWRBAND: u32 = 0x00000200;
-// const EPOLLMSG: u32 = 0x00000400;
-const EPOLLRDHUP: u32 = 0x00002000;
-
-// note: the source `(1U << 28)`, U suffix means unsigned int
-
-const EPOLLEXCLUSIVE: u32 = 1 << 28;
-const EPOLLWAKEUP: u32 = 1 << 29;
-const EPOLLONESHOT: u32 = 1 << 30;
-const EPOLLET: u32 = 1 << 31;
-
-// #[repr(C, packed)]
-// struct epoll_event {
-//     events: __poll_t,
-//     data: __u64,
-// }
-
-// TODO: ioctl
-//
-// struct epoll_params {
-//     __u32 busy_poll_usecs;
-//     __u16 busy_poll_budget;
-//     __u8 prefer_busy_poll;
-//
-//     /* pad the struct to a multiple of 64bits */
-//     __u8 __pad;
-// };
-//
-// #define EPOLL_IOC_TYPE 0x8A
-// #define EPIOCSPARAMS _IOW(EPOLL_IOC_TYPE, 0x01, struct epoll_params)
-// #define EPIOCGPARAMS _IOR(EPOLL_IOC_TYPE, 0x02, struct epoll_params)

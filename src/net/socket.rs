@@ -1,4 +1,4 @@
-//! Linux socket.
+//! [`Socket`] associated types.
 use core::mem::MaybeUninit;
 use core::{fmt, mem, result};
 
@@ -127,11 +127,11 @@ impl Type {
     /// Provides sequenced, reliable, two-way, connection-based byte streams.
     ///
     /// An out-of-band data transmission mechanism may be supported.
-    pub const STREAM: Self = Self(SOCK_STREAM);
+    pub const STREAM: Self = Self(sys::SOCK_STREAM);
     /// Supports datagrams (connectionless, unreliable messages of a fixed maximum length).
-    pub const DGRAM: Self = Self(SOCK_DGRAM);
+    pub const DGRAM: Self = Self(sys::SOCK_DGRAM);
     /// Provides raw network protocol access.
-    pub const RAW: Self = Self(SOCK_RAW);
+    pub const RAW: Self = Self(sys::SOCK_RAW);
 }
 
 // ===== Flags =====
@@ -143,9 +143,9 @@ pub struct Flags(i32);
 
 impl Flags {
     /// Set the close-on-exec (FD_CLOEXEC) flag on the new fd.
-    pub const CLOEXEC: Self = Self(SOCK_CLOEXEC);
+    pub const CLOEXEC: Self = Self(sys::SOCK_CLOEXEC);
     /// Set the `O_NONBLOCK` file status flag on the new fd.
-    pub const NONBLOCK: Self = Self(SOCK_NONBLOCK);
+    pub const NONBLOCK: Self = Self(sys::SOCK_NONBLOCK);
 }
 
 impl flags::OpenFlag for Flags {
@@ -165,7 +165,7 @@ pub struct SendFlags(i32);
 impl SendFlags {
     /// Enables nonblocking operation; if the operation would block, the call fails with EAGAIN or
     /// EWOULDBLOCK.
-    pub const DONTWAIT: Self = Self(MSG_DONTWAIT);
+    pub const DONTWAIT: Self = Self(sys::MSG_DONTWAIT);
 }
 
 flags::impl_bitops_simple!(SendFlags);
@@ -180,12 +180,12 @@ pub struct RecvFlags(i32);
 impl RecvFlags {
     /// Set the close-on-exec flag for the fd received via a UNIX domain fd using the `SCM_RIGHTS`
     /// operation.
-    pub const CMSG_CLOEXEC: Self = Self(MSG_CMSG_CLOEXEC);
+    pub const CMSG_CLOEXEC: Self = Self(sys::MSG_CMSG_CLOEXEC);
     /// Enables nonblocking operation; if the operation would block, the call fails with EAGAIN or
     /// EWOULDBLOCK.
-    pub const DONTWAIT: Self = Self(MSG_DONTWAIT);
+    pub const DONTWAIT: Self = Self(sys::MSG_DONTWAIT);
     /// Receive message without removing that data from the queue.
-    pub const PEEK: Self = Self(MSG_PEEK);
+    pub const PEEK: Self = Self(sys::MSG_PEEK);
 }
 
 flags::impl_bitops_simple!(RecvFlags);
@@ -259,49 +259,3 @@ impl fmt::Display for Error {
         write!(f, "failed to {msg}: {cause}")
     }
 }
-
-// ===== extern =====
-
-// source: include/linux/socket.h
-
-// #define MSG_OOB		1
-const MSG_PEEK: i32 = 2;
-// #define MSG_DONTROUTE	4
-// #define MSG_TRYHARD     4
-// #define MSG_CTRUNC	8
-// #define MSG_PROBE	0
-// #define MSG_TRUNC	0x20
-const MSG_DONTWAIT: i32 = 0x40;
-// #define MSG_EOR         0x80
-// #define MSG_WAITALL	0x100
-// #define MSG_FIN         0x200
-// #define MSG_SYN		0x400
-// #define MSG_CONFIRM	0x800
-// #define MSG_RST		0x1000
-// #define MSG_ERRQUEUE	0x2000
-// #define MSG_NOSIGNAL	0x4000
-// #define MSG_MORE	0x8000
-// #define MSG_WAITFORONE	0x10000
-// #define MSG_SENDPAGE_NOPOLICY 0x10000
-// #define MSG_BATCH	0x40000
-// #define MSG_EOF         MSG_FIN
-// #define MSG_NO_SHARED_FRAGS 0x80000
-// #define MSG_SENDPAGE_DECRYPTED	0x100000
-// #define MSG_SOCK_DEVMEM 0x2000000
-// #define MSG_ZEROCOPY	0x4000000
-// #define MSG_SPLICE_PAGES 0x8000000
-// #define MSG_FASTOPEN	0x20000000
-const MSG_CMSG_CLOEXEC: i32 = 0x40000000;
-
-// source: include/linux/net.h
-
-const SOCK_STREAM: i32 = 1;
-const SOCK_DGRAM: i32 = 2;
-const SOCK_RAW: i32 = 3;
-// const SOCK_RDM: i32 = 4;
-// const SOCK_SEQPACKET: i32 = 5;
-// const SOCK_DCCP: i32 = 6;
-// const SOCK_PACKET: i32 = 10;
-
-const SOCK_CLOEXEC: i32 = sys::O_CLOEXEC;
-const SOCK_NONBLOCK: i32 = sys::O_NONBLOCK;

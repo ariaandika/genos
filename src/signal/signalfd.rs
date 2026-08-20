@@ -44,7 +44,7 @@ impl Signalfd {
 /// Pending signal information.
 #[derive(Debug, Clone)]
 #[repr(transparent)]
-pub struct Siginfo(signalfd_siginfo);
+pub struct Siginfo(sys::signalfd_siginfo);
 
 impl Siginfo {
     /// Returns the pending [`Signo`].
@@ -63,9 +63,9 @@ pub struct Flags(i32);
 
 impl Flags {
     /// Set the close-on-exec (FD_CLOEXEC) flag on the new fd.
-    pub const CLOEXEC: Self = Self(SFD_CLOEXEC);
+    pub const CLOEXEC: Self = Self(sys::SFD_CLOEXEC);
     /// Set the `O_NONBLOCK` file status flag on the new fd.
-    pub const NONBLOCK: Self = Self(SFD_NONBLOCK);
+    pub const NONBLOCK: Self = Self(sys::SFD_NONBLOCK);
 }
 
 impl flags::OpenFlag for Flags {
@@ -104,38 +104,4 @@ impl fmt::Display for Error {
         };
         write!(f, "failed to {msg}: {code}")
     }
-}
-
-// ===== extern =====
-
-// source: include/uapi/linux/signalfd.h
-
-const SFD_CLOEXEC: i32 = sys::O_CLOEXEC;
-const SFD_NONBLOCK: i32 = sys::O_NONBLOCK;
-
-#[derive(Debug, Clone)]
-#[repr(C)]
-struct signalfd_siginfo {
-    ssi_signo: u32,
-    ssi_errno: i32,
-    ssi_code: i32,
-    ssi_pid: u32,
-    ssi_uid: u32,
-    ssi_fd: i32,
-    ssi_tid: u32,
-    ssi_band: u32,
-    ssi_overrun: u32,
-    ssi_trapno: u32,
-    ssi_status: i32,
-    ssi_int: i32,
-    ssi_ptr: u64,
-    ssi_utime: u64,
-    ssi_stime: u64,
-    ssi_addr: u64,
-    ssi_addr_lsb: u16,
-    __pad2: u16,
-    ssi_syscall: i32,
-    ssi_call_addr: u64,
-    ssi_arch: u32,
-    __pad: [u8; 28],
 }

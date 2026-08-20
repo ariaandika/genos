@@ -1,7 +1,11 @@
 pub(crate) use arch::*;
+pub(crate) use shared::*;
 pub(crate) use types::*;
 
-// shared definition that may be reexported by arch specific
+// default fallback for arch specific definitions
+mod asm_generic;
+
+// architecture independent definitions
 mod shared;
 
 // helper types
