@@ -1,6 +1,6 @@
 //! [`Socket`] associated types.
 use core::mem::MaybeUninit;
-use core::{fmt, mem, result};
+use core::{fmt, result};
 
 use crate::error::{ErrCode, SysResExt};
 use crate::fd::{AsFd, OwnedFd};
@@ -11,7 +11,7 @@ use crate::{error, fd, flags, sys};
 
 // ===== Socket =====
 
-/// Linux socket.
+/// Communication endpoint.
 #[derive(Debug)]
 pub struct Socket(OwnedFd);
 
@@ -20,11 +20,13 @@ fd::impl_fd_simple!(Socket);
 impl Socket {
     /// Creates new [`Socket`].
     #[inline]
-    pub fn create(family: Family, ty: Type, flags: Flags) -> Result<Self> {
-        sys::call!(RD, __NR_socket, i32::from(family), ty.0 | flags.0, 0).fd(Kind::Create)
+    pub fn create(domain: Family, ty: Type, flags: Flags) -> Result<Self> {
+        sys::call!(RD, __NR_socket, i32::from(domain), ty.0 | flags.0, 0).fd(Kind::Create)
     }
 
     /// Creates new UNIX domain [`Socket`] stream.
+    ///
+    /// This is a helper method to create socket with [`Family::UNIX`] and [`Type::STREAM`].
     #[inline]
     pub fn unix_stream(flags: Flags) -> Result<Self> {
         Self::create(Family::UNIX, Type::STREAM, flags)
@@ -33,39 +35,42 @@ impl Socket {
     /// Bind address to this socket.
     #[inline]
     pub fn bind<A: SockAddr>(&self, addr: &A) -> Result<()> {
-        let (raw, len) = addr.as_raw();
-        sys::call!(RD, __NR_bind, self.as_fd(), raw, len).e(Kind::Bind)
+        let len = size_of::<A>() as sys::socklen_t;
+        sys::call!(RD, __NR_bind, self.as_fd(), addr, len).e(Kind::Bind)
     }
 
     /// Initiate a connection on this socket.
     #[inline]
     pub fn connect<A: SockAddr>(&self, addr: &A) -> Result<()> {
-        let (raw, len) = addr.as_raw();
-        sys::call!(RD, __NR_connect, self.as_fd(), raw, len).e(Kind::Connect)
+        let len = size_of::<A>() as sys::socklen_t;
+        sys::call!(RD, __NR_connect, self.as_fd(), addr, len).e(Kind::Connect)
     }
 
     /// Returns this socket address.
     #[inline]
     pub fn addr<A: SockAddr>(&self) -> Result<A> {
-        let mut addr = unsafe { mem::zeroed::<A::Raw>() };
-        let mut len = size_of::<A::Raw>() as _;
-        let res = sys::call!(__NR_getsockname, self.as_fd(), &mut addr, &mut len);
-        match res.e(Kind::GetAddr) {
-            Ok(()) => A::from_raw(addr, len).map_err(<_>::into),
-            Err(err) => Err(err),
-        }
+        let (mut addr, mut len) = (A::zeroed(), A::socklen_t());
+        sys::call!(__NR_getsockname, self.as_fd(), &mut addr, &mut len).e(Kind::GetAddr)?;
+        Self::validate_addr(addr, len)
     }
 
     /// Returns the peer socket address.
     #[inline]
     pub fn peer_addr<A: SockAddr>(&self) -> Result<A> {
-        let mut addr = unsafe { mem::zeroed::<A::Raw>() };
-        let mut len = size_of::<A::Raw>() as _;
-        let res = sys::call!(__NR_getpeername, self.as_fd(), &mut addr, &mut len);
-        match res.e(Kind::GetAddr) {
-            Ok(()) => A::from_raw(addr, len).map_err(<_>::into),
-            Err(err) => Err(err),
+        let (mut addr, mut len) = (A::zeroed(), A::socklen_t());
+        sys::call!(__NR_getpeername, self.as_fd(), &mut addr, &mut len).e(Kind::GetAddr)?;
+        Self::validate_addr(addr, len)
+    }
+
+    #[inline]
+    fn validate_addr<A: SockAddr>(addr: A, len: sys::socklen_t) -> Result<A> {
+        if addr.sa_family() != A::FAMILY.sa_family() {
+            return Err(AddrError::MissmatchFamily.into());
         }
+        if len > A::socklen_t() {
+            return Err(AddrError::MissmatchFamily.into());
+        }
+        Ok(addr)
     }
 
     /// Listen for connections on this socket.
@@ -125,8 +130,6 @@ pub struct Type(i32);
 
 impl Type {
     /// Provides sequenced, reliable, two-way, connection-based byte streams.
-    ///
-    /// An out-of-band data transmission mechanism may be supported.
     pub const STREAM: Self = Self(sys::SOCK_STREAM);
     /// Supports datagrams (connectionless, unreliable messages of a fixed maximum length).
     pub const DGRAM: Self = Self(sys::SOCK_DGRAM);

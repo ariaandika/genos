@@ -13,6 +13,8 @@ pub const SOCK_NONBLOCK: i32 = sys::O_NONBLOCK;
 
 // source: include/linux/socket.h
 
+pub type sa_family_t = __kernel_sa_family_t;
+
 pub const SCM_RIGHTS: i32 = 0x01;
 pub const AF_UNIX: i32 = 1;
 pub const AF_LOCAL: i32 = 1;
@@ -31,6 +33,13 @@ pub const fn CMSG_SPACE(length: usize) -> usize {
 
 pub const fn CMSG_LEN(length: usize) -> usize {
     CMSG_ALIGN(size_of::<cmsghdr>()) + length
+}
+
+#[derive(Debug)]
+#[repr(C)]
+pub struct sockaddr {
+    pub sa_family: sa_family_t,
+    pub sa_data: [ffi::c_char; 14],
 }
 
 #[derive(Debug)]

@@ -1,18 +1,37 @@
 //! Socket address.
-use core::ffi::CStr;
-use core::{error, ffi, fmt, mem};
+use core::{error, fmt};
 
 use crate::sys;
 
 // ===== SockAddr =====
 
-/// A socket address.
-pub trait SockAddr: sealed::Sealed {}
-mod sealed {
+/// Socket family specific address.
+pub trait SockAddr: sealed::Sealed {
+    /// The socket address family.
+    const FAMILY: Family;
+}
+
+pub(super) mod sealed {
+    use crate::sys;
+
+    /// Implementor must guarantee:
+    ///
+    /// - the struct layout is a superset of [`sys::sockaddr`].
+    /// - the struct layout is valid for all zero bits
     pub trait Sealed: Sized {
-        type Raw;
-        fn as_raw(&self) -> (&Self::Raw, super::sys::socklen_t);
-        fn from_raw(raw: Self::Raw, len: u32) -> Result<Self, super::AddrError>;
+        fn sa_family(&self) -> sys::sa_family_t {
+            // SAFETY: guarantee by the implementor
+            unsafe { &*(self as *const Self as *const sys::sockaddr) }.sa_family
+        }
+
+        fn zeroed() -> Self {
+            // SAFETY: guarantee by the implementor
+            unsafe { core::mem::zeroed() }
+        }
+
+        fn socklen_t() -> sys::socklen_t {
+            size_of::<Self>() as _
+        }
     }
 }
 
@@ -20,8 +39,8 @@ mod sealed {
 
 /// Socket address family.
 ///
-/// See `address_families(7)`.
-#[derive(Debug, Clone, Copy)]
+/// For more details, see `address_families(7)`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct Family(i32);
 
@@ -38,81 +57,16 @@ impl Family {
     pub const INET: Self = Self(sys::AF_INET);
 }
 
+impl Family {
+    pub(super) const fn sa_family(self) -> sys::sa_family_t {
+        self.0 as _
+    }
+}
+
 impl From<Family> for i32 {
     #[inline]
     fn from(value: Family) -> Self {
         value.0
-    }
-}
-
-// ===== SockaddrUn =====
-
-const SUN_PATH_OFFSET: usize = mem::offset_of!(sockaddr_un, sun_path);
-
-/// UNIX domain socket address.
-#[derive(Debug)]
-pub struct SockaddrUn {
-    addr: sockaddr_un,
-    len: u32,
-}
-
-impl SockaddrUn {
-    /// Creates [`SockaddrUn`] with given path.
-    #[inline]
-    pub const fn from_path(path: &CStr) -> Result<Self, AddrError> {
-        let mut addr = unsafe { mem::zeroed::<sockaddr_un>() };
-        addr.sun_family = Family::UNIX.0 as _;
-        let path = path.to_bytes_with_nul();
-        if path.len() > addr.sun_path.len() {
-            return Err(AddrError::ExcessivePath);
-        }
-        unsafe {
-            addr.sun_path
-                .as_mut_ptr()
-                .copy_from_nonoverlapping(path.as_ptr().cast(), path.len());
-        };
-        // `unix(7)`
-        let len = (SUN_PATH_OFFSET + path.len()) as _;
-        Ok(Self { addr, len })
-    }
-
-    /// Returns the address pathname.
-    #[inline]
-    pub fn as_pathname(&self) -> Option<&CStr> {
-        // `unix(7)`
-        let addr_len = self.len as usize - SUN_PATH_OFFSET;
-        if addr_len == 0 {
-            // unnamed
-            return None;
-        } else if self.addr.sun_path[0] == 0 {
-            // abstract
-            return None;
-        }
-        unsafe {
-            let path = mem::transmute::<&[ffi::c_char], &[u8]>(&self.addr.sun_path[..]);
-            let path = path.get_unchecked(..addr_len);
-            Some(CStr::from_bytes_with_nul_unchecked(path))
-        }
-    }
-}
-
-impl SockAddr for SockaddrUn {}
-impl sealed::Sealed for SockaddrUn {
-    type Raw = sockaddr_un;
-
-    #[inline]
-    fn as_raw(&self) -> (&Self::Raw, sys::socklen_t) {
-        (&self.addr, self.len)
-    }
-
-    #[inline]
-    fn from_raw(addr: Self::Raw, mut len: u32) -> Result<Self, AddrError> {
-        if len == 0 {
-            len = SUN_PATH_OFFSET as _;
-        } else if addr.sun_family != Family::UNIX.0 as _ {
-            return Err(AddrError::MissmatchFamily);
-        }
-        Ok(Self { addr, len })
     }
 }
 
@@ -137,14 +91,4 @@ impl fmt::Display for AddrError {
         };
         msg.fmt(f)
     }
-}
-
-// ===== extern =====
-
-/// Raw type for UNIX socket address.
-#[derive(Debug)]
-#[repr(C)]
-pub struct sockaddr_un {
-    sun_family: sys::__kernel_sa_family_t,
-    sun_path: [ffi::c_char; sys::UNIX_PATH_MAX],
 }

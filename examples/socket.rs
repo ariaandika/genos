@@ -5,9 +5,8 @@ use core::mem::MaybeUninit;
 
 use genos::env::Args;
 use genos::error::AsErrCode;
-use genos::net::addr::SockaddrUn;
 use genos::net::socket::RecvFlags;
-use genos::net::{OpenFlag, Socket};
+use genos::net::{OpenFlag, SockAddrUn, Socket};
 use genos::println;
 
 genos::main!(|args, _| start(args).is_err() as _);
@@ -16,9 +15,9 @@ fn start(args: Args) -> Result<(), Error> {
     let path = args.iter().nth(1).ok_or("path argument required")?;
 
     let socket = Socket::unix_stream(<_>::CLOEXEC)?;
-    socket.connect(&SockaddrUn::from_path(path)?)?;
+    socket.connect(&SockAddrUn::from_path(path)?)?;
 
-    if let Ok(addr) = socket.peer_addr::<SockaddrUn>()
+    if let Ok(addr) = socket.peer_addr::<SockAddrUn>()
         && let Some(path) = addr.as_pathname()
     {
         println!("connected to {path:?}");
