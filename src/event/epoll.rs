@@ -2,7 +2,7 @@
 use core::mem::MaybeUninit;
 use core::{fmt, result};
 
-use crate::error::{AsErrCode, ErrCode, SysResExt};
+use crate::error::{ErrCode, SysResExt};
 use crate::fd::{AsFd, OwnedFd};
 use crate::{error, fd, flags, sys};
 
@@ -73,17 +73,7 @@ impl Epoll {
     /// occurred for the corresponding open file description.
     #[inline]
     pub fn wait(&self, buf: &mut [MaybeUninit<Event>], timeout: i32) -> Result<usize> {
-        let res = sys::call!(__NR_epoll_wait, self.as_fd(), &mut *buf, buf.len(), timeout);
-        match res.io(Kind::Wait) {
-            Ok(len) => Ok(len),
-            Err(err) => {
-                if err.is_interrupt() {
-                    Ok(0)
-                } else {
-                    Err(err)
-                }
-            }
-        }
+        sys::call!(__NR_epoll_wait, self.as_fd(), &mut *buf, buf.len(), timeout).io(Kind::Wait)
     }
 }
 
