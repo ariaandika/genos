@@ -1,7 +1,7 @@
 //! Error types.
 pub use core::error::Error;
 use core::num::NonZeroU8;
-use core::{ffi, fmt};
+use core::{ffi, fmt, ptr};
 
 use crate::fd::FromRawFd;
 use crate::sys::SysRes;
@@ -52,7 +52,13 @@ pub(crate) trait ErrorKind {
 
 /// Extensions trait for converting syscall result.
 pub(crate) trait SysResExt: Sized {
-    fn inner(self) -> Result<usize, ErrCode>;
+    fn into_inner(self) -> isize;
+
+    #[doc(hidden)]
+    fn inner(self) -> Result<usize, ErrCode> {
+        let r = self.into_inner();
+        usize::try_from(r).map_err(|_| ErrCode::sys(r))
+    }
 
     /// Creates file descriptor from success result.
     fn fd<T: FromRawFd, E: ErrorKind>(self, kind: E) -> Result<T, E::Error> {
@@ -89,12 +95,22 @@ pub(crate) trait SysResExt: Sized {
     fn io2<E: FromErrCode>(self) -> Result<usize, E> {
         self.inner().map_err(E::from_err_code)
     }
+
+    /// Returns non-null pointer from success result.
+    fn p2<T, E: FromErrCode>(self) -> Result<ptr::NonNull<T>, E> {
+        let res = self.into_inner();
+        if res > 0 {
+            // SAFETY: `res > 0` means `res != 0`
+            Ok(unsafe { ptr::NonNull::new_unchecked(res as *mut T) })
+        } else {
+            Err(E::from_err_code(ErrCode::sys(res)))
+        }
+    }
 }
 
 impl SysResExt for SysRes {
-    fn inner(self) -> Result<usize, ErrCode> {
-        let r = self.into_inner();
-        usize::try_from(r).map_err(|_| ErrCode::sys(r))
+    fn into_inner(self) -> isize {
+        SysRes::into_inner(self)
     }
 }
 

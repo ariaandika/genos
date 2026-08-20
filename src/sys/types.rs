@@ -1,3 +1,5 @@
+use core::ptr;
+
 use crate::fd::{AsRawFd, BorrowedFd};
 
 pub(crate) trait IntoArg {
@@ -13,7 +15,7 @@ macro_rules! impl_into_arg_cast {
         }
     )*};
 }
-impl_into_arg_cast!(u32, i32);
+impl_into_arg_cast!(u32, i32, u64, i64);
 
 impl IntoArg for usize {
     fn into_arg(self) -> usize {
@@ -60,6 +62,12 @@ impl<T> IntoArg for *const T {
 impl<T> IntoArg for *mut T {
     fn into_arg(self) -> usize {
         self as _
+    }
+}
+
+impl<T> IntoArg for ptr::NonNull<T> {
+    fn into_arg(self) -> usize {
+        self.as_ptr() as _
     }
 }
 
