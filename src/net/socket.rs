@@ -6,7 +6,7 @@ use crate::error::{ErrCode, SysResExt};
 use crate::fd::{AsFd, OwnedFd};
 use crate::io::{Read, ReadError, Write, WriteError};
 use crate::net::addr::{AddrError, Family, SockAddr};
-use crate::net::msg::MsgHdr;
+use crate::net::msg::{MsgHdr, MsgHdrMut};
 use crate::{error, fd, flags, sys};
 
 // ===== Socket =====
@@ -110,7 +110,7 @@ impl Socket {
 
     /// Receive message from this fd.
     #[inline]
-    pub fn recvmsg(&self, msg: &mut MsgHdr, flags: RecvFlags) -> Result<usize> {
+    pub fn recvmsg(&self, msg: &mut MsgHdrMut, flags: RecvFlags) -> Result<usize> {
         sys::call!(__NR_recvmsg, self.as_fd(), msg, flags.0).io(Kind::Read)
     }
 

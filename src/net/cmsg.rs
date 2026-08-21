@@ -85,12 +85,18 @@ impl<T: CMsgKind + ?Sized, const N: usize> CMsgArray<T, N> {
 impl<T: CMsgKind + ?Sized, const N: usize> AncillaryData for CMsgArray<T, N> {}
 impl<T: CMsgKind + ?Sized, const N: usize> sealed::Sealed for CMsgArray<T, N> {
     #[inline]
+    fn as_ptr(&self) -> *const ffi::c_void {
+        self as *const _ as _
+    }
+
+    #[inline]
     fn as_mut_ptr(&mut self) -> *mut ffi::c_void {
         self as *mut _ as _
     }
 
     #[inline]
     fn space(&self) -> usize {
+        // same result using `CMSG_SPACE`
         size_of::<Self>()
     }
 }
