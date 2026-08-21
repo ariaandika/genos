@@ -87,6 +87,7 @@ impl cmsghdr {
 // source: include/linux/types.h
 
 pub type mode_t = sys::__kernel_mode_t;
+pub type off_t = sys::__kernel_off_t;
 
 // ===== uapi =====
 

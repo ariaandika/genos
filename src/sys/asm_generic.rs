@@ -65,3 +65,4 @@ pub const MAP_ANONYMOUS: i32 = 0x20;
 // source: include/uapi/asm-generic/posix_types.h
 
 pub type __kernel_mode_t = ffi::c_uint;
+pub type __kernel_off_t = ffi::c_long;

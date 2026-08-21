@@ -20,6 +20,14 @@ pub trait Write: AsFd {
             .io2::<WriteError>()
             .map_err(<_>::into)
     }
+
+    /// Writes bytes from the buffer to this fd at given offset.
+    #[inline]
+    fn pwrite(&self, buf: &[u8], offset: sys::off_t) -> Result<usize, Self::Error> {
+        sys::call!(RD, __NR_pwrite64, self.as_fd(), buf, buf.len(), offset)
+            .io2::<WriteError>()
+            .map_err(<_>::into)
+    }
 }
 
 /// An error that may occur when writing to fd.

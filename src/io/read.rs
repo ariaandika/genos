@@ -24,6 +24,14 @@ pub trait Read: AsFd {
             .io2::<ReadError>()
             .map_err(<_>::into)
     }
+
+    /// Read bytes from this fd into the buffer at given offset.
+    #[inline]
+    fn pread(&self, buf: &mut [MaybeUninit<u8>], offset: sys::off_t) -> Result<usize, Self::Error> {
+        sys::call!(__NR_pread64, self.as_fd(), &mut *buf, buf.len(), offset)
+            .io2::<ReadError>()
+            .map_err(<_>::into)
+    }
 }
 
 /// An error that may occur when reading from fd.
