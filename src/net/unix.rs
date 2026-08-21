@@ -41,28 +41,33 @@ impl SockAddrUn {
         Ok(addr)
     }
 
-    fn path(&self) -> &CStr {
-        // SAFETY: `sun_path` guarantee to be null terminated
-        unsafe { CStr::from_ptr(self.sun_path.as_ptr().cast()) }
-    }
-
-    /// Returns the address pathname.
+    /// Returns the address as pathname.
+    ///
+    /// Returns [`None`] if the addres is unnamed or abstract.
     #[inline]
     pub fn as_pathname(&self) -> Option<&CStr> {
-        // `unix(7)`
-        let addr_len = self.path().count_bytes() + 1;
-        if addr_len == 0 {
+        if self.sun_path[0] == 0 {
+            return None;
+        }
+        // SAFETY: `sun_path` guarantee to be null terminated
+        unsafe { Some(CStr::from_ptr(self.sun_path.as_ptr().cast())) }
+    }
+
+    /// Returns the address as abstract address.
+    ///
+    /// Returns [`None`] if the addres is unnamed or pathname.
+    #[inline]
+    pub fn as_abstract(&self) -> Option<&CStr> {
+        if self.sun_path[0] != 0 {
+            // pathname
+            return None;
+        }
+        if self.sun_path[1] == 0 {
             // unnamed
             return None;
-        } else if self.sun_path[0] == 0 {
-            // abstract
-            return None;
         }
-        unsafe {
-            let path = mem::transmute::<&[ffi::c_char], &[u8]>(&self.sun_path[..]);
-            let path = path.get_unchecked(..addr_len);
-            Some(CStr::from_bytes_with_nul_unchecked(path))
-        }
+        let addr = &self.sun_path[1..6];
+        unsafe { Some(CStr::from_bytes_with_nul_unchecked(mem::transmute::<&[i8], &[u8]>(addr))) }
     }
 }
 
