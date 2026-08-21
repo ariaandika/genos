@@ -14,6 +14,9 @@ pub const SOCK_DGRAM: i32 = 2;
 pub const SOCK_RAW: i32 = 3;
 pub const SOCK_CLOEXEC: i32 = sys::O_CLOEXEC;
 pub const SOCK_NONBLOCK: i32 = sys::O_NONBLOCK;
+pub const SHUT_RD: i32 = 0;
+pub const SHUT_WR: i32 = 1;
+pub const SHUT_RDWR: i32 = 2;
 
 // source: include/linux/socket.h
 

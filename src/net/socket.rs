@@ -78,6 +78,12 @@ impl Socket {
     pub fn listen(&self) -> Result<()> {
         sys::call!(RD, __NR_listen, self.as_fd(), -1).e(Kind::Listen)
     }
+
+    /// Shut down part of a full-duplex connection.
+    #[inline]
+    pub fn shutdown(&self) -> Result<()> {
+        sys::call!(RD, __NR_shutdown, self.as_fd(), -1).e(Kind::Shutdown)
+    }
 }
 
 impl Read for Socket {
@@ -193,6 +199,22 @@ impl RecvFlags {
 
 flags::impl_bitops_simple!(RecvFlags);
 
+// ===== ShutdownFlags =====
+
+/// Shutdown types.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(transparent)]
+pub struct Shutdown(i32);
+
+impl Shutdown {
+    /// Disable further receptions.
+    pub const READ: Self = Self(sys::SHUT_RD);
+    /// Disable further transmission.
+    pub const WRITE: Self = Self(sys::SHUT_WR);
+    /// Disable further receptions and transmission.
+    pub const BOTH: Self = Self(sys::SHUT_RDWR);
+}
+
 // ===== Error =====
 
 /// Type alias for result of [`Socket`] operations.
@@ -215,6 +237,7 @@ enum Kind {
     Write,
     Accept,
     GetAddr,
+    Shutdown,
     Addr(AddrError),
 }
 
@@ -257,6 +280,7 @@ impl fmt::Display for Error {
             Kind::Write => "write socket",
             Kind::Accept => "accept socket connection",
             Kind::GetAddr => "get socket address",
+            Kind::Shutdown => "shutdown socket",
             Kind::Addr(_) => "create socket address",
         };
         write!(f, "failed to {msg}: {cause}")
