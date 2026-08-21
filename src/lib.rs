@@ -18,6 +18,7 @@ pub mod flags;
 
 pub mod env;
 pub mod event;
+pub mod fs;
 pub mod io;
 pub mod mem;
 pub mod net;
