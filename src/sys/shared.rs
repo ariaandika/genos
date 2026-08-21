@@ -3,6 +3,10 @@ use core::ffi;
 
 use crate::sys;
 
+// source: include/net/scm.h
+
+pub const SCM_MAX_FD: i32 = 253;
+
 // source: include/linux/net.h
 
 pub const SOCK_STREAM: i32 = 1;
@@ -67,6 +71,14 @@ pub struct cmsghdr {
     pub cmsg_len: usize,
     pub cmsg_level: i32,
     pub cmsg_type: i32,
+}
+
+impl cmsghdr {
+    /// Returns data length in bytes.
+    pub const fn data_len(&self) -> usize {
+        // the reverse of `CMSG_LEN`
+        self.cmsg_len - CMSG_ALIGN(size_of::<cmsghdr>())
+    }
 }
 
 // ===== uapi =====

@@ -1,8 +1,9 @@
 //! UNIX socket address.
 use core::ffi::CStr;
-use core::{ffi, fmt, mem};
+use core::{ffi, fmt, marker, mem};
 
 use crate::net::addr::{AddrError, Family, SockAddr, sealed};
+use crate::net::cmsg::{CMsgKind, CMsgType};
 use crate::sys;
 
 // ===== SockaddrUn =====
@@ -79,4 +80,21 @@ impl fmt::Debug for SockAddrUn {
             .field(&self.as_pathname().unwrap_or(c"<abstract>"))
             .finish()
     }
+}
+
+// ===== cmsg =====
+
+/// Control message to send or receive a set of open fd from another process.
+#[derive(Debug)]
+pub struct SCMRights(marker::PhantomData<()>);
+
+impl SCMRights {
+    /// Maximum number of file descriptors that can be in the control message buffer.
+    pub const MAX_FD: i32 = sys::SCM_MAX_FD;
+}
+
+impl CMsgKind for SCMRights {
+    type Data = i32;
+
+    const TYPE: CMsgType = CMsgType::RIGHTS;
 }

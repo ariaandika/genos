@@ -11,13 +11,13 @@ pub trait AncillaryData: sealed::Sealed {}
 
 pub(super) mod sealed {
     pub trait Sealed {
+        /// Returns the pointer to the buffer.
         fn as_ptr(&self) -> *const super::ffi::c_void;
 
+        /// Returns the pointer to the buffer.
         fn as_mut_ptr(&mut self) -> *mut super::ffi::c_void;
 
-        /// Returns the buffer length with a padding.
-        ///
-        /// Goes with the logic in `CMSG_SPACE`.
+        /// Returns the buffer length with the padding.
         fn space(&self) -> usize;
     }
 }

@@ -6,7 +6,8 @@ use core::mem::MaybeUninit;
 use genos::env::Args;
 use genos::error::AsErrCode;
 use genos::net::socket::RecvFlags;
-use genos::net::{OpenFlag, SockAddrUn, Socket};
+use genos::net::unix::SockAddrUn;
+use genos::net::{OpenFlag, Socket};
 use genos::println;
 
 genos::main!(|args, _| start(args).is_err() as _);

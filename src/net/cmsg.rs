@@ -33,6 +33,22 @@ impl From<CMsgType> for i32 {
     }
 }
 
+// ===== cmsg =====
+
+// control message are packed header with arbitrary data:
+//
+// ```
+// struct cmsghdr {
+//    size_t cmsg_len;
+//    int    cmsg_level;
+//    int    cmsg_type;
+//    /* followed by unsigned char cmsg_data[]; */
+// };
+// ```
+//
+// - size: size_of<cmsghdr>() + size_of<data>() + padding
+// - align: align_of<cmsghdr>().max(align_of<data>())
+
 // ===== CMsgArray =====
 
 /// Control message array.
@@ -47,31 +63,33 @@ pub struct CMsgArray<T: CMsgKind + ?Sized, const N: usize> {
 impl<T: CMsgKind + ?Sized, const N: usize> CMsgArray<T, N> {
     /// Creates [`CMsgArray`] with uninitialized data.
     #[inline]
-    pub fn uninit() -> Self {
+    pub const fn uninit() -> Self {
         let data = [const { mem::MaybeUninit::uninit() }; N];
-        Self::new_inner(data, sys::CMSG_LEN(size_of::<[T::Data; 0]>()))
+        Self::new_inner(data, size_of::<[T::Data; 0]>())
     }
 
     /// Creates [`CMsgArray`] with given type and data.
     #[inline]
     pub fn new(data: [T::Data; N]) -> Self {
+        // [`MaybeUninit::transpose`]: https://github.com/rust-lang/rust/issues/96097
         let data = mem::MaybeUninit::new(data).into();
-        Self::new_inner(data, sys::CMSG_LEN(size_of::<[T::Data; N]>()))
+        Self::new_inner(data, size_of::<[T::Data; N]>())
     }
 
-    fn new_inner(data: [mem::MaybeUninit<T::Data>; N], cmsg_len: usize) -> Self {
+    const fn new_inner(data: [mem::MaybeUninit<T::Data>; N], data_len: usize) -> Self {
         const { assert!(sys::CMSG_SPACE(size_of::<[T::Data; N]>()) == size_of::<Self>()) };
-        Self {
-            hdr: sys::cmsghdr { cmsg_len, cmsg_level: sys::SOL_SOCKET, cmsg_type: T::TYPE.0 },
-            data,
-            _kind: marker::PhantomData,
-        }
+        let hdr = sys::cmsghdr {
+            cmsg_len: sys::CMSG_LEN(data_len),
+            cmsg_level: sys::SOL_SOCKET,
+            cmsg_type: T::TYPE.0,
+        };
+        Self { hdr, data, _kind: marker::PhantomData }
     }
 
     /// Returns length of the initialized data.
     #[inline]
-    pub fn len(&self) -> usize {
-        self.hdr.cmsg_len / size_of::<T::Data>()
+    pub const fn len(&self) -> usize {
+        self.hdr.data_len() / size_of::<T::Data>()
     }
 
     /// Returns the initialized data as slice.
@@ -99,16 +117,4 @@ impl<T: CMsgKind + ?Sized, const N: usize> sealed::Sealed for CMsgArray<T, N> {
         // same result using `CMSG_SPACE`
         size_of::<Self>()
     }
-}
-
-// ===== CMsgBuf =====
-
-/// Control message to send or receive a set of open fd from another process.
-#[derive(Debug)]
-pub struct SCMRights(marker::PhantomData<()>);
-
-impl CMsgKind for SCMRights {
-    type Data = i32;
-
-    const TYPE: CMsgType = CMsgType::RIGHTS;
 }
