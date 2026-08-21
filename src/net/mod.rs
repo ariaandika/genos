@@ -6,8 +6,6 @@ pub use crate::flags::OpenFlag;
 
 // ===== mods =====
 
-pub mod iovec;
-
 pub mod addr;
 pub mod msg;
 pub mod cmsg;

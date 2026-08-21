@@ -1,7 +1,7 @@
 //! Socket message.
 use core::{ffi, fmt, marker};
 
-use crate::net::iovec::{IoVec, IoVecMut};
+use crate::io::{IoVec, IoVecMut};
 use crate::sys;
 
 // ===== AncillaryData =====

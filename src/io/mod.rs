@@ -1,8 +1,10 @@
 //! I/O Abstraction.
+pub use iovec::{IoVec, IoVecMut};
 pub use read::{Read, ReadError};
 pub use write::{Write, WriteError};
 pub use stream::{Stderr, Stdin, Stdout};
 
+mod iovec;
 mod read;
 mod write;
 mod stream;
