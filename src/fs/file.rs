@@ -1,12 +1,12 @@
 //! [`File`] associated types.
 
 use core::ffi::CStr;
-use core::{fmt, result};
 
-use crate::error::{ErrCode, SysResExt};
-use crate::fd::OwnedFd;
-use crate::io::{Read, ReadError, Write, WriteError};
-use crate::{error, fd, flags, sys};
+use crate::error::SysResExt;
+use crate::fd::{AsFd, OwnedFd};
+use crate::fs::{Error, Kind, Result};
+use crate::io::{Read, Write};
+use crate::{fd, flags, sys};
 
 /// File handle.
 #[derive(Debug)]
@@ -18,13 +18,19 @@ impl File {
     /// Opens specified file.
     #[inline]
     pub fn open(path: &CStr, mode: AccessMode) -> Result<Self> {
-        sys::call!(__NR_open, path.as_ptr(), mode.0).fd(Kind::Open)
+        sys::call!(RD, __NR_open, path, mode.0).fd(Kind::Open)
     }
 
     /// Create file if does not exists, open in write-only mode, and truncate to length 0.
     #[inline]
     pub fn create(path: &CStr, mode: sys::mode_t) -> Result<Self> {
-        sys::call!(__NR_creat, path.as_ptr(), mode).fd(Kind::Create)
+        sys::call!(RD, __NR_creat, path, mode).fd(Kind::Create)
+    }
+
+    /// Truncate file to a size of precisely length bytes.
+    #[inline]
+    pub fn truncate(&self, length: sys::off_t) -> Result<()> {
+        sys::call!(RD, __NR_ftruncate, self.as_fd(), length).e(Kind::Truncate)
     }
 }
 
@@ -121,53 +127,4 @@ impl StatusFlags {
     /// Write operations on the file will complete according to the requirements of synchronized I/O
     /// file integrity completion.
     pub const SYNC: Self = Self(sys::O_SYNC);
-}
-
-// ===== errors =====
-
-/// Type alias for result of [`File`] operations.
-pub type Result<T> = result::Result<T, Error>;
-
-/// An error that may occur during any [`File`] operations.
-#[derive(Debug, Clone)]
-pub struct Error {
-    kind: Kind,
-    code: ErrCode,
-}
-
-#[derive(Debug, Clone)]
-enum Kind {
-    Open,
-    Create,
-    Read,
-    Write,
-}
-
-error::impl_error_with_kind!(Error, Kind);
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { kind, code } = self;
-        let msg = match kind {
-            Kind::Open => "open file",
-            Kind::Create => "create file",
-            Kind::Read => "read file",
-            Kind::Write => "write file",
-        };
-        write!(f, "failed to {msg}: {code}")
-    }
-}
-
-impl From<ReadError> for Error {
-    #[inline]
-    fn from(value: ReadError) -> Self {
-        Self { kind: Kind::Read, code: value.into() }
-    }
-}
-
-impl From<WriteError> for Error {
-    #[inline]
-    fn from(value: WriteError) -> Self {
-        Self { kind: Kind::Write, code: value.into() }
-    }
 }

@@ -1,4 +1,4 @@
-use core::ptr;
+use core::{ffi, ptr};
 
 use crate::fd::{AsRawFd, BorrowedFd};
 
@@ -66,6 +66,12 @@ impl<T> IntoArg for *mut T {
 }
 
 impl<T> IntoArg for ptr::NonNull<T> {
+    fn into_arg(self) -> usize {
+        self.as_ptr() as _
+    }
+}
+
+impl IntoArg for &ffi::CStr {
     fn into_arg(self) -> usize {
         self.as_ptr() as _
     }
