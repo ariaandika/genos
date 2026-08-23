@@ -12,7 +12,7 @@ use genos::println;
 
 genos::main!(|args, _| start(args).is_err() as _);
 
-fn start(args: Args) -> Result<(), Error> {
+fn start(args: &Args) -> Result<(), Error> {
     let path = args.iter().nth(1).ok_or("path argument required")?;
 
     let socket = Socket::unix_stream(<_>::CLOEXEC)?;
