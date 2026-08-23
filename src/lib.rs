@@ -14,6 +14,7 @@ mod sys;
 
 pub mod error;
 pub mod fd;
+pub mod ffi;
 pub mod flags;
 
 pub mod env;
