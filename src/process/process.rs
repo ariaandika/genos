@@ -1,8 +1,22 @@
+use core::ffi::CStr;
 use core::num::NonZeroI32;
 
 use crate::error::{ErrCode, SysResExt};
+use crate::ffi::Char;
 use crate::signal::Signo;
 use crate::{error, sys};
+
+/// Terminate process with given status code.
+#[inline]
+pub fn _exit(status: i32) -> ! {
+    sys::call!(NORETURN, __NR_exit, status)
+}
+
+/// Executes the program referred to by path.
+#[inline]
+pub fn execve(path: &CStr, argv: &Option<&Char>, envp: &Option<&Char>) -> ErrCode {
+    ErrCode::new(-sys::call!(RD, __NR_execve, path, argv, envp).into_inner() as _)
+}
 
 /// Process handle.
 #[derive(Debug, Clone)]
