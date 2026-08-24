@@ -1,27 +1,37 @@
 //! [`Vars`] associated types.
 use core::{ffi, fmt};
 
+use crate::ffi::Char;
+
+type Head = &'static Elem;
+
+type Elem = Option<&'static Char>;
+
 /// Environment variables.
-#[derive(Clone)]
-pub struct Vars {
-    ptr: *const *const ffi::c_char,
-}
+pub struct Vars(Head);
 
 impl Vars {
     /// Creates [`Vars`] from raw pointer.
     ///
     /// # Safety
     ///
-    /// This is only intended to be created right at the start of the main function.
+    /// This is only intended to be used with libc style main function argument.
+    #[doc(hidden)]
     #[inline]
-    pub unsafe fn from_raw(ptr: *const *const ffi::c_char) -> Self {
-        Self { ptr }
+    pub const unsafe fn from_raw(envp: *const *const ffi::c_char) -> Self {
+        unsafe { Self(envp.cast::<Elem>().as_ref_unchecked()) }
+    }
+
+    /// Retruns the inner pointer.
+    #[inline]
+    pub const fn as_ptr(&self) -> *const *const ffi::c_char {
+        &raw const self.0 as *const _
     }
 
     /// Returns an iterator over the variables.
     #[inline]
     pub fn iter(&self) -> Iter {
-        self.into_iter()
+        Iter(self.0)
     }
 }
 
@@ -38,7 +48,7 @@ impl IntoIterator for Vars {
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        Iter { ptr: self.ptr }
+        Iter(self.0)
     }
 }
 
@@ -49,7 +59,7 @@ impl IntoIterator for &Vars {
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        Iter { ptr: self.ptr }
+        Iter(self.0)
     }
 }
 
@@ -57,22 +67,15 @@ impl IntoIterator for &Vars {
 
 /// [`Vars`] iterator.
 #[derive(Debug)]
-pub struct Iter {
-    ptr: *const *const ffi::c_char,
-}
+pub struct Iter(Head);
 
 impl Iterator for Iter {
     type Item = &'static ffi::CStr;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        unsafe {
-            let next = *self.ptr;
-            if next.is_null() {
-                return None;
-            }
-            self.ptr = self.ptr.add(1);
-            Some(ffi::CStr::from_ptr(next))
-        }
+        let next = (*self.0)?;
+        self.0 = unsafe { &*(self.0 as *const Elem).add(1) };
+        Some(next.as_cstr())
     }
 }
