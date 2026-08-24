@@ -25,12 +25,12 @@ pub trait FromRawFd {
 pub trait AsFd {
     /// Borrows the file descriptor.
     fn as_fd(&self) -> BorrowedFd<'_>;
-}
 
-/// A trait to extract the raw file descriptor from an underlying object.
-pub trait AsRawFd {
     /// Extracts the raw file descriptor.
-    fn as_raw_fd(&self) -> RawFd;
+    #[inline]
+    fn as_raw_fd(&self) -> RawFd {
+        self.as_fd().fd
+    }
 }
 
 /// A trait to express the ability to consume an object and acquire ownership of its raw file
@@ -127,27 +127,6 @@ impl AsFd for OwnedFd {
     }
 }
 
-impl AsRawFd for RawFd {
-    #[inline]
-    fn as_raw_fd(&self) -> RawFd {
-        *self
-    }
-}
-
-impl AsRawFd for BorrowedFd<'_> {
-    #[inline]
-    fn as_raw_fd(&self) -> RawFd {
-        self.fd
-    }
-}
-
-impl AsRawFd for OwnedFd {
-    #[inline]
-    fn as_raw_fd(&self) -> RawFd {
-        self.0
-    }
-}
-
 impl IntoRawFd for RawFd {
     #[inline]
     fn into_raw_fd(self) -> RawFd {
@@ -182,20 +161,6 @@ impl<T: AsFd + ?Sized> AsFd for &mut T {
     }
 }
 
-impl<T: AsRawFd + ?Sized> AsRawFd for &T {
-    #[inline]
-    fn as_raw_fd(&self) -> RawFd {
-        T::as_raw_fd(self)
-    }
-}
-
-impl<T: AsRawFd + ?Sized> AsRawFd for &mut T {
-    #[inline]
-    fn as_raw_fd(&self) -> RawFd {
-        T::as_raw_fd(self)
-    }
-}
-
 macro_rules! impl_fd_simple {
     ($me:ident) => {
         impl crate::fd::FromRawFd for $me {
@@ -208,12 +173,6 @@ macro_rules! impl_fd_simple {
             #[inline]
             fn as_fd(&self) -> crate::fd::BorrowedFd<'_> {
                 self.0.as_fd()
-            }
-        }
-        impl crate::fd::AsRawFd for $me {
-            #[inline]
-            fn as_raw_fd(&self) -> crate::fd::RawFd {
-                self.0.as_raw_fd()
             }
         }
         impl crate::fd::IntoRawFd for $me {

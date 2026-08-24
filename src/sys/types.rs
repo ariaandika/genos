@@ -1,6 +1,6 @@
 use core::{ffi, ptr};
 
-use crate::fd::{AsRawFd, BorrowedFd};
+use crate::fd::{AsFd, BorrowedFd};
 
 pub(crate) trait IntoArg {
     fn into_arg(self) -> usize;
