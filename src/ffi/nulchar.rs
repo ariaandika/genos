@@ -8,7 +8,6 @@ use crate::ffi::{self, CStr};
 /// This can be used to store C string in a contiguous memory, avoiding pointer type.
 ///
 /// [`c_char`]: ffi::c_char
-#[derive(Debug)]
 #[repr(transparent)]
 pub struct Char(ffi::c_char);
 
@@ -36,5 +35,12 @@ impl<'a> From<&'a CStr> for &'a Char {
     #[inline]
     fn from(value: &'a CStr) -> Self {
         Char::new(value)
+    }
+}
+
+impl core::fmt::Debug for Char {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        let s = unsafe { CStr::from_ptr(self as *const _ as *const _) };
+        s.fmt(f)
     }
 }
