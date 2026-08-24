@@ -44,11 +44,17 @@ impl<'c> Args<'c> {
         self.0.len() - 1
     }
 
+    /// Retruns the inner pointer.
+    #[inline]
+    pub const fn as_ptr(&self) -> *const *const ffi::c_char {
+        self as *const _ as *const _
+    }
+
     /// Returns the list of arguments as slice.
     #[inline]
     pub const fn as_slice(&self) -> &[&'c Char] {
-        // SAFETY: it is guarantee that only the last element is `None` (null pointer).
-        unsafe { slice::from_raw_parts(self.0.as_ptr().cast(), self.len() - 1) }
+        // SAFETY: it is guarantee that `len()` exclude the null pointer
+        unsafe { slice::from_raw_parts(self.0.as_ptr().cast(), self.len()) }
     }
 
     /// Returns an iterator over the arguments.
