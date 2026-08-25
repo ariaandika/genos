@@ -1,7 +1,7 @@
 //! Dynamic memory allocation.
-use core::{error, fmt, ptr};
+use core::ptr;
 
-use crate::error::{AsErrCode, ErrCode};
+use crate::mem::OutOfMemory;
 
 /// Allocate `size` bytes and returns a pointer to the allocated memory.
 #[inline]
@@ -26,27 +26,6 @@ pub fn realloc(ptr: ptr::NonNull<u8>, size: usize) -> Result<ptr::NonNull<u8>, O
 #[inline]
 pub unsafe fn free(ptr: ptr::NonNull<u8>) {
     unsafe { ffi::free(ptr.as_ptr()) };
-}
-
-// ===== error =====
-
-/// An error that may occur when allocating memory.
-#[derive(Debug)]
-pub struct OutOfMemory;
-
-impl error::Error for OutOfMemory {}
-
-impl fmt::Display for OutOfMemory {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "out of memory")
-    }
-}
-
-impl AsErrCode for OutOfMemory {
-    #[inline]
-    fn as_err_code(&self) -> ErrCode {
-        ErrCode::ENOMEM
-    }
 }
 
 // ===== extern =====

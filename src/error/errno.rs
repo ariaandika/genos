@@ -6,35 +6,6 @@ use crate::error::ErrCode;
 pub(crate) trait FromErrCode: Sized {
     /// Creates error with given error code.
     fn from_err_code(code: ErrCode) -> Self;
-
-    /// Creates error with value from `errno`.
-    fn errno() -> Self {
-        Self::from_err_code(ErrCode::errno())
-    }
-
-    /// Returns `Err` if `res` is -1.
-    fn e<T: FromOkCode>(res: i32) -> Result<T, Self> {
-        if res == -1 {
-            return Err(Self::errno());
-        }
-        Ok(T::from_ok_code(res as _))
-    }
-}
-
-// ===== FromOkCode =====
-
-pub(crate) trait FromOkCode {
-    fn from_ok_code(code: usize) -> Self;
-}
-
-impl FromOkCode for usize {
-    fn from_ok_code(val: usize) -> Self {
-        val
-    }
-}
-
-impl FromOkCode for () {
-    fn from_ok_code(_: usize) -> Self {}
 }
 
 // ===== macros =====

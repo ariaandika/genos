@@ -1,4 +1,4 @@
-use crate::ffi::{self, CStr};
+use core::ffi::{self, CStr};
 
 /// Wrapper type around [`c_char`].
 ///
@@ -40,7 +40,15 @@ impl<'a> From<&'a CStr> for &'a Char {
 
 impl core::fmt::Debug for Char {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
-        let s = unsafe { CStr::from_ptr(self as *const _ as *const _) };
-        s.fmt(f)
+        let mut c = self.as_ptr().cast::<u8>();
+        loop {
+            match unsafe { *c } {
+                0 => break,
+                c @ b'\x01'..=b'\x7f' => write!(f, "{}", c.escape_ascii())?,
+                c => write!(f, "{}", c as char)?,
+            }
+            c = unsafe { c.add(1) };
+        }
+        Ok(())
     }
 }

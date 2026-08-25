@@ -42,7 +42,7 @@ impl fmt::Debug for Vars {
 }
 
 impl IntoIterator for Vars {
-    type Item = &'static ffi::CStr;
+    type Item = &'static Char;
 
     type IntoIter = Iter;
 
@@ -53,7 +53,7 @@ impl IntoIterator for Vars {
 }
 
 impl IntoIterator for &Vars {
-    type Item = &'static ffi::CStr;
+    type Item = &'static Char;
 
     type IntoIter = Iter;
 
@@ -70,12 +70,12 @@ impl IntoIterator for &Vars {
 pub struct Iter(Head);
 
 impl Iterator for Iter {
-    type Item = &'static ffi::CStr;
+    type Item = &'static Char;
 
     #[inline]
     fn next(&mut self) -> Option<Self::Item> {
         let next = (*self.0)?;
         self.0 = unsafe { &*(self.0 as *const Elem).add(1) };
-        Some(next.as_cstr())
+        Some(next)
     }
 }

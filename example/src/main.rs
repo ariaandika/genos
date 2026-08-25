@@ -80,5 +80,8 @@ fn panic_me(info: &core::panic::PanicInfo) -> ! {
 #[unsafe(no_mangle)]
 extern "C" fn rust_eh_personality() {}
 
-#[link(name = "c")]
-unsafe extern "C" {}
+#[unsafe(no_mangle)]
+unsafe extern "C" fn memset(ptr: *mut core::ffi::c_void, val: i32, n: usize) -> *mut core::ffi::c_void {
+    unsafe { core::ptr::write_bytes(ptr, val as u8, n) };
+    ptr
+}

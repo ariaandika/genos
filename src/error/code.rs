@@ -25,18 +25,6 @@ impl ErrCode {
         })
     }
 
-    /// Creates [`ErrCode`] with value retrieved from `errno`.
-    #[inline]
-    pub fn errno() -> Self {
-        Self::new(Self::raw_errno())
-    }
-
-    /// Returns raw error code from `errno`.
-    #[inline]
-    pub fn raw_errno() -> i32 {
-        unsafe { *__errno_location() }
-    }
-
     /// Returns the contained raw error code.
     #[inline]
     pub const fn code(self) -> i32 {
@@ -72,10 +60,6 @@ impl fmt::Display for ErrCode {
 }
 
 // ===== extern =====
-
-unsafe extern "C" {
-    fn __errno_location() -> *mut i32;
-}
 
 // source: include/uapi/asm-generic/errno-base.h
 // source: include/uapi/asm-generic/errno.h

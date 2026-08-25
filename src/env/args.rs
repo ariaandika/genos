@@ -1,4 +1,3 @@
-//! [`Args`] associated types.
 use core::{ffi, fmt, slice};
 
 use crate::ffi::Char;
@@ -59,8 +58,8 @@ impl<'c> Args<'c> {
 
     /// Returns an iterator over the arguments.
     #[inline]
-    pub fn iter(&self) -> Iter<'_, 'c> {
-        Iter(self.as_slice().iter())
+    pub fn iter(&self) -> slice::Iter<'_, &'c Char> {
+        self.as_slice().iter()
     }
 }
 
@@ -83,25 +82,12 @@ impl fmt::Debug for Args<'_> {
 // ===== Iterator =====
 
 impl<'a, 'c> IntoIterator for &'a Args<'c> {
-    type Item = &'c ffi::CStr;
+    type Item = &'a &'c Char;
 
-    type IntoIter = Iter<'a, 'c>;
+    type IntoIter = slice::Iter<'a, &'c Char>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
         self.iter()
-    }
-}
-
-/// Iterator of [`Args`].
-#[derive(Debug)]
-pub struct Iter<'a, 'c>(slice::Iter<'a, &'c Char>);
-
-impl<'a, 'c> Iterator for Iter<'a, 'c> {
-    type Item = &'c ffi::CStr;
-
-    #[inline]
-    fn next(&mut self) -> Option<Self::Item> {
-        self.0.next().map(|e| e.as_cstr())
     }
 }
