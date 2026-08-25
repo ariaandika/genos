@@ -33,17 +33,6 @@ const __O_TMPFILE: i32 = 1 << 22;
 // a horrid kludge trying to make sure that this will fail on old kernels
 pub const O_TMPFILE: i32 = __O_TMPFILE | O_DIRECTORY;
 
-// source: include/uapi/asm-generic/errno-base.h
-
-pub const EINTR: i32 = 4;
-pub const EAGAIN: i32 = 11;
-pub const ENOMEM: i32 = 12;
-pub const EINVAL: i32 = 22;
-
-// source: include/uapi/asm-generic/errno.h
-
-pub const EWOULDBLOCK: i32 = EAGAIN;
-
 // source: include/uapi/asm-generic/socket.h
 
 pub const SOL_SOCKET: i32 = 1;
