@@ -236,6 +236,11 @@ pub use crate::sys::asm_generic::*;
 // - `syscalls(2)`
 
 // source: arch/x86/entry/syscalls/syscall_64.tbl
+
+pub const epoll_wait: c_long = 232; // __NR_epoll_wait
+pub const epoll_ctl: c_long = 233; // __NR_epoll_ctl
+pub const epoll_create1: c_long = 291; // __NR_epoll_create1
+
 // replaced prefix `sys_` with `__NR_`
 
 pub const __NR_read: c_long = 0;
@@ -451,9 +456,6 @@ pub const __NR_io_submit: c_long = 209;
 pub const __NR_io_cancel: c_long = 210;
 pub const __NR_get_thread_area: c_long = 211;
 pub const __NR_lookup_dcookie: c_long = 212;
-pub const __NR_epoll_create: c_long = 213;
-pub const __NR_epoll_ctl_old: c_long = 214;
-pub const __NR_epoll_wait_old: c_long = 215;
 pub const __NR_remap_file_pages: c_long = 216;
 pub const __NR_getdents64: c_long = 217;
 pub const __NR_set_tid_address: c_long = 218;
@@ -470,8 +472,6 @@ pub const __NR_clock_gettime: c_long = 228;
 pub const __NR_clock_getres: c_long = 229;
 pub const __NR_clock_nanosleep: c_long = 230;
 pub const __NR_exit_group: c_long = 231;
-pub const __NR_epoll_wait: c_long = 232;
-pub const __NR_epoll_ctl: c_long = 233;
 pub const __NR_tgkill: c_long = 234;
 pub const __NR_utimes: c_long = 235;
 pub const __NR_vserver: c_long = 236;
@@ -519,7 +519,6 @@ pub const __NR_sync_file_range: c_long = 277;
 pub const __NR_vmsplice: c_long = 278;
 pub const __NR_move_pages: c_long = 279;
 pub const __NR_utimensat: c_long = 280;
-pub const __NR_epoll_pwait: c_long = 281;
 pub const __NR_signalfd: c_long = 282;
 pub const __NR_timerfd_create: c_long = 283;
 pub const __NR_eventfd: c_long = 284;
@@ -529,7 +528,6 @@ pub const __NR_timerfd_gettime: c_long = 287;
 pub const __NR_accept4: c_long = 288;
 pub const __NR_signalfd4: c_long = 289;
 pub const __NR_eventfd2: c_long = 290;
-pub const __NR_epoll_create1: c_long = 291;
 pub const __NR_dup3: c_long = 292;
 pub const __NR_pipe2: c_long = 293;
 pub const __NR_inotify_init1: c_long = 294;
@@ -592,7 +590,6 @@ pub const __NR_openat2: c_long = 437;
 pub const __NR_pidfd_getfd: c_long = 438;
 pub const __NR_faccessat2: c_long = 439;
 pub const __NR_process_madvise: c_long = 440;
-pub const __NR_epoll_pwait2: c_long = 441;
 pub const __NR_mount_setattr: c_long = 442;
 pub const __NR_quotactl_fd: c_long = 443;
 pub const __NR_landlock_create_ruleset: c_long = 444;
