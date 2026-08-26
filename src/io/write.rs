@@ -1,6 +1,6 @@
 use crate::error::{ErrCode, SysResExt};
 use crate::fd::AsFd;
-use crate::io::IoVec;
+use crate::io::{IOFlags, IoVec, Offset};
 use crate::{error, sys};
 
 /// A writable file descriptor.
@@ -17,15 +17,15 @@ pub trait Write: AsFd {
     /// or the call was interrupted by a signal handler after having written less than count bytes.
     #[inline]
     fn write(&self, buf: &[u8]) -> Result<usize, Self::Error> {
-        sys::call!(RD, __NR_write, self.as_fd(), buf, buf.len())
+        sys::call!(RD, sys_write, self.as_fd(), buf, buf.len())
             .io2::<WriteError>()
             .map_err(<_>::into)
     }
 
     /// Writes bytes from the buffer to this fd at given offset.
     #[inline]
-    fn pwrite(&self, buf: &[u8], offset: sys::off_t) -> Result<usize, Self::Error> {
-        sys::call!(RD, __NR_pwrite64, self.as_fd(), buf, buf.len(), offset)
+    fn pwrite(&self, buf: &[u8], offset: Offset) -> Result<usize, Self::Error> {
+        sys::call!(RD, sys_pwrite64, self.as_fd(), buf, buf.len(), offset)
             .io2::<WriteError>()
             .map_err(<_>::into)
     }
@@ -33,19 +33,26 @@ pub trait Write: AsFd {
     /// Writes bytes from gathered buffer to this fd.
     #[inline]
     fn writev(&self, buf: &[IoVec<'_>]) -> Result<usize, Self::Error> {
-        sys::call!(RD, __NR_writev, self.as_fd(), buf, buf.len())
+        sys::call!(RD, sys_writev, self.as_fd(), buf, buf.len())
             .io2::<WriteError>()
             .map_err(<_>::into)
     }
 
     /// Writes bytes from gathered buffer to this fd at given offset.
     #[inline]
-    fn pwritev(&self, buf: &[IoVec<'_>], offset: sys::off_t) -> Result<usize, Self::Error> {
-        sys::call!(RD, __NR_pwritev, self.as_fd(), buf, buf.len(), offset)
+    fn pwritev(
+        &self,
+        buf: &[IoVec<'_>],
+        offset: Offset,
+        flags: IOFlags,
+    ) -> Result<usize, Self::Error> {
+        sys::call!(RD, sys_pwritev, self.as_fd(), buf, buf.len(), offset, i32::from(flags))
             .io2::<WriteError>()
             .map_err(<_>::into)
     }
 }
+
+// ===== Error =====
 
 /// An error that may occur when writing to fd.
 #[derive(Clone, Copy)]

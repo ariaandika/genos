@@ -5,13 +5,8 @@ use core::ffi::CStr;
 use crate::error::SysResExt;
 use crate::fd::{AsFd, OwnedFd};
 use crate::fs::{Error, Kind, Result};
-use crate::io::{Read, Write};
+use crate::io::{Offset, Read, Write};
 use crate::{fd, flags, sys};
-
-/// Integer representing file size.
-///
-/// Reference: `off_t(3type)`.
-pub type Off = sys::off_t;
 
 /// Open file.
 #[derive(Debug)]
@@ -25,7 +20,7 @@ impl File {
     /// Reference: `open(2)`.
     #[inline]
     pub fn open(path: &CStr, mode: AccessMode) -> Result<Self> {
-        sys::call!(RD, open, path, mode.0).fd(Kind::Open)
+        sys::call!(RD, sys_open, path, mode.0).fd(Kind::Open)
     }
 
     /// Create file if does not exists, open in write-only mode, and truncate to length 0.
@@ -33,15 +28,15 @@ impl File {
     /// Reference: `creat(2)`.
     #[inline]
     pub fn create(path: &CStr, mode: sys::mode_t) -> Result<Self> {
-        sys::call!(RD, creat, path, mode).fd(Kind::Create)
+        sys::call!(RD, sys_creat, path, mode).fd(Kind::Create)
     }
 
     /// Reposition read/write offset.
     ///
     /// Reference: `lseek(2)`.
     #[inline]
-    pub fn seek(&self, offset: sys::off_t, seek: Seek) -> Result<Off> {
-        sys::call!(RD, lseek, self.as_fd(), offset, seek.0)
+    pub fn seek(&self, offset: Offset, seek: Seek) -> Result<Offset> {
+        sys::call!(RD, sys_lseek, self.as_fd(), offset, seek.0)
             .io(Kind::Seek)
             .map(|e| e as _)
     }
@@ -50,8 +45,8 @@ impl File {
     ///
     /// Reference: `ftruncate(2)`.
     #[inline]
-    pub fn truncate(&self, length: Off) -> Result<()> {
-        sys::call!(RD, ftruncate, self.as_fd(), length).e(Kind::Truncate)
+    pub fn truncate(&self, length: Offset) -> Result<()> {
+        sys::call!(RD, sys_ftruncate, self.as_fd(), length).e(Kind::Truncate)
     }
 }
 

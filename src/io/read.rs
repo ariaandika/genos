@@ -2,7 +2,7 @@ use core::mem::MaybeUninit;
 
 use crate::error::{ErrCode, SysResExt};
 use crate::fd::AsFd;
-use crate::io::IoVecMut;
+use crate::io::{IOFlags, IoVecMut, Offset};
 use crate::{error, sys};
 
 /// A readable file descriptor.
@@ -21,15 +21,15 @@ pub trait Read: AsFd {
     /// interrupted by a signal.
     #[inline]
     fn read(&self, buf: &mut [MaybeUninit<u8>]) -> Result<usize, Self::Error> {
-        sys::call!(__NR_read, self.as_fd(), &mut *buf, buf.len())
+        sys::call!(sys_read, self.as_fd(), &mut *buf, buf.len())
             .io2::<ReadError>()
             .map_err(<_>::into)
     }
 
     /// Read bytes from this fd into the buffer at given offset.
     #[inline]
-    fn pread(&self, buf: &mut [MaybeUninit<u8>], offset: sys::off_t) -> Result<usize, Self::Error> {
-        sys::call!(__NR_pread64, self.as_fd(), &mut *buf, buf.len(), offset)
+    fn pread(&self, buf: &mut [MaybeUninit<u8>], offset: Offset) -> Result<usize, Self::Error> {
+        sys::call!(sys_pread64, self.as_fd(), &mut *buf, buf.len(), offset)
             .io2::<ReadError>()
             .map_err(<_>::into)
     }
@@ -37,19 +37,26 @@ pub trait Read: AsFd {
     /// Read bytes from this fd into given scattered buffer.
     #[inline]
     fn readv(&self, buf: &[IoVecMut]) -> Result<usize, Self::Error> {
-        sys::call!(__NR_readv, self.as_fd(), buf, buf.len())
+        sys::call!(sys_readv, self.as_fd(), buf, buf.len())
             .io2::<ReadError>()
             .map_err(<_>::into)
     }
 
     /// Read bytes from this fd into given scattered buffer at given offset.
     #[inline]
-    fn preadv(&self, buf: &[IoVecMut], offset: sys::off_t) -> Result<usize, Self::Error> {
-        sys::call!(__NR_preadv, self.as_fd(), buf, buf.len(), offset)
+    fn preadv(
+        &self,
+        buf: &[IoVecMut],
+        offset: Offset,
+        flags: IOFlags,
+    ) -> Result<usize, Self::Error> {
+        sys::call!(sys_preadv2, self.as_fd(), buf, buf.len(), offset, i32::from(flags))
             .io2::<ReadError>()
             .map_err(<_>::into)
     }
 }
+
+// ===== Error =====
 
 /// An error that may occur when reading from fd.
 #[derive(Clone, Copy)]

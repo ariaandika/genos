@@ -119,6 +119,15 @@ pub const SEEK_END: i32 = 2;
 pub const SEEK_DATA: i32 = 3;
 pub const SEEK_HOLE: i32 = 4;
 
+pub const RWF_HIPRI: i32 = 0x00000001;
+pub const RWF_DSYNC: i32 = 0x00000002;
+pub const RWF_SYNC: i32 = 0x00000004;
+pub const RWF_NOWAIT: i32 = 0x00000008;
+pub const RWF_APPEND: i32 = 0x00000010;
+pub const RWF_NOAPPEND: i32 = 0x00000020;
+pub const RWF_ATOMIC: i32 = 0x00000040;
+pub const RWF_DONTCACHE: i32 = 0x00000080;
+
 // source: include/uapi/linux/mman.h
 
 pub const MAP_SHARED: i32 = 0x01;

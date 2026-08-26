@@ -24,7 +24,6 @@ use crate::sys::SysRes;
 // More on Rust inline assembly: https://doc.rust-lang.org/reference/inline-assembly.html
 
 #[inline]
-#[doc(hidden)]
 pub(crate) unsafe fn call0_rd(nr: c_long) -> SysRes {
     let ret;
     asm!(
@@ -38,7 +37,6 @@ pub(crate) unsafe fn call0_rd(nr: c_long) -> SysRes {
 }
 
 #[inline]
-#[doc(hidden)]
 pub(crate) unsafe fn call1_rd(nr: c_long, a1: usize) -> SysRes {
     let ret;
     asm!(
@@ -53,10 +51,8 @@ pub(crate) unsafe fn call1_rd(nr: c_long, a1: usize) -> SysRes {
 }
 
 #[inline]
-#[doc(hidden)]
 pub(crate) unsafe fn call1_noret(nr: c_long, a1: usize) -> ! {
     // [ud2]: <https://doc.rust-lang.org/reference/inline-assembly.html#r-asm.options.supported-options.noreturn>
-    // #[doc(hidden)]
     asm!(
         "syscall",
         "ud2",
@@ -67,7 +63,6 @@ pub(crate) unsafe fn call1_noret(nr: c_long, a1: usize) -> ! {
 }
 
 #[inline]
-#[doc(hidden)]
 pub(crate) unsafe fn call2(nr: c_long, a1: usize, a2: usize) -> SysRes {
     let ret;
     asm!(
@@ -83,7 +78,6 @@ pub(crate) unsafe fn call2(nr: c_long, a1: usize, a2: usize) -> SysRes {
 }
 
 #[inline]
-#[doc(hidden)]
 pub(crate) unsafe fn call2_rd(nr: c_long, a1: usize, a2: usize) -> SysRes {
     let ret;
     asm!(
@@ -99,7 +93,6 @@ pub(crate) unsafe fn call2_rd(nr: c_long, a1: usize, a2: usize) -> SysRes {
 }
 
 #[inline]
-#[doc(hidden)]
 pub(crate) unsafe fn call3(nr: c_long, a1: usize, a2: usize, a3: usize) -> SysRes {
     let ret;
     asm!(
@@ -116,7 +109,6 @@ pub(crate) unsafe fn call3(nr: c_long, a1: usize, a2: usize, a3: usize) -> SysRe
 }
 
 #[inline]
-#[doc(hidden)]
 pub(crate) unsafe fn call3_rd(nr: c_long, a1: usize, a2: usize, a3: usize) -> SysRes {
     let ret;
     asm!(
@@ -133,7 +125,6 @@ pub(crate) unsafe fn call3_rd(nr: c_long, a1: usize, a2: usize, a3: usize) -> Sy
 }
 
 #[inline]
-#[doc(hidden)]
 pub(crate) unsafe fn call4(nr: c_long, a1: usize, a2: usize, a3: usize, a4: usize) -> SysRes {
     let ret;
     asm!(
@@ -151,7 +142,6 @@ pub(crate) unsafe fn call4(nr: c_long, a1: usize, a2: usize, a3: usize, a4: usiz
 }
 
 #[inline]
-#[doc(hidden)]
 pub(crate) unsafe fn call4_rd(nr: c_long, a1: usize, a2: usize, a3: usize, a4: usize) -> SysRes {
     let ret;
     asm!(
@@ -169,7 +159,56 @@ pub(crate) unsafe fn call4_rd(nr: c_long, a1: usize, a2: usize, a3: usize, a4: u
 }
 
 #[inline]
-#[doc(hidden)]
+pub(crate) unsafe fn call5(
+    nr: c_long,
+    a1: usize,
+    a2: usize,
+    a3: usize,
+    a4: usize,
+    a5: usize,
+) -> SysRes {
+    let ret;
+    asm!(
+        "syscall",
+        inlateout("rax") nr => ret,
+        in("rdi") a1,
+        in("rsi") a2,
+        in("rdx") a3,
+        in("r10") a4,
+        in("r8") a5,
+        lateout("rcx") _,
+        lateout("r11") _,
+        options(nostack, preserves_flags)
+    );
+    SysRes::new(ret)
+}
+
+#[inline]
+pub(crate) unsafe fn call5_rd(
+    nr: c_long,
+    a1: usize,
+    a2: usize,
+    a3: usize,
+    a4: usize,
+    a5: usize,
+) -> SysRes {
+    let ret;
+    asm!(
+        "syscall",
+        inlateout("rax") nr => ret,
+        in("rdi") a1,
+        in("rsi") a2,
+        in("rdx") a3,
+        in("r10") a4,
+        in("r8") a5,
+        lateout("rcx") _,
+        lateout("r11") _,
+        options(nostack, preserves_flags, readonly)
+    );
+    SysRes::new(ret)
+}
+
+#[inline]
 pub(crate) unsafe fn call6(
     nr: c_long,
     a1: usize,
@@ -197,7 +236,6 @@ pub(crate) unsafe fn call6(
 }
 
 #[inline]
-#[doc(hidden)]
 pub(crate) unsafe fn call6_rd(
     nr: c_long,
     a1: usize,
@@ -237,10 +275,21 @@ pub use crate::sys::asm_generic::*;
 
 // source: arch/x86/entry/syscalls/syscall_64.tbl
 
-pub const open: c_long = 2; // __NR_open
-pub const lseek: c_long = 8; // __NR_lseek
-pub const creat: c_long = 85; // __NR_creat
-pub const ftruncate: c_long = 77; // __NR_ftruncate
+// new definitions aboiding `__NR_` prefix which silence unused variable lint
+
+pub const sys_read: c_long = 0;
+pub const sys_write: c_long = 1;
+pub const sys_open: c_long = 2;
+pub const sys_lseek: c_long = 8;
+pub const sys_pread64: c_long = 17;
+pub const sys_pwrite64: c_long = 18;
+pub const sys_readv: c_long = 19;
+pub const sys_writev: c_long = 20;
+pub const sys_ftruncate: c_long = 77;
+pub const sys_creat: c_long = 85;
+pub const sys_pwritev: c_long = 296;
+pub const sys_preadv2: c_long = 327;
+
 pub const epoll_wait: c_long = 232; // __NR_epoll_wait
 pub const epoll_ctl: c_long = 233; // __NR_epoll_ctl
 pub const epoll_create1: c_long = 291; // __NR_epoll_create1
@@ -248,7 +297,6 @@ pub const epoll_create1: c_long = 291; // __NR_epoll_create1
 // replaced prefix `sys_` with `__NR_`
 
 pub const __NR_read: c_long = 0;
-pub const __NR_write: c_long = 1;
 pub const __NR_close: c_long = 3;
 pub const __NR_stat: c_long = 4;
 pub const __NR_fstat: c_long = 5;
@@ -262,10 +310,6 @@ pub const __NR_rt_sigaction: c_long = 13;
 pub const __NR_rt_sigprocmask: c_long = 14;
 pub const __NR_rt_sigreturn: c_long = 15;
 pub const __NR_ioctl: c_long = 16;
-pub const __NR_pread64: c_long = 17;
-pub const __NR_pwrite64: c_long = 18;
-pub const __NR_readv: c_long = 19;
-pub const __NR_writev: c_long = 20;
 pub const __NR_access: c_long = 21;
 pub const __NR_pipe: c_long = 22;
 pub const __NR_select: c_long = 23;
@@ -531,8 +575,6 @@ pub const __NR_eventfd2: c_long = 290;
 pub const __NR_dup3: c_long = 292;
 pub const __NR_pipe2: c_long = 293;
 pub const __NR_inotify_init1: c_long = 294;
-pub const __NR_preadv: c_long = 295;
-pub const __NR_pwritev: c_long = 296;
 pub const __NR_rt_tgsigqueueinfo: c_long = 297;
 pub const __NR_perf_event_open: c_long = 298;
 pub const __NR_recvmmsg: c_long = 299;
@@ -563,7 +605,6 @@ pub const __NR_userfaultfd: c_long = 323;
 pub const __NR_membarrier: c_long = 324;
 pub const __NR_mlock2: c_long = 325;
 pub const __NR_copy_file_range: c_long = 326;
-pub const __NR_preadv2: c_long = 327;
 pub const __NR_pwritev2: c_long = 328;
 pub const __NR_pkey_mprotect: c_long = 329;
 pub const __NR_pkey_alloc: c_long = 330;
