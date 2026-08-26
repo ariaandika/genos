@@ -237,6 +237,10 @@ pub use crate::sys::asm_generic::*;
 
 // source: arch/x86/entry/syscalls/syscall_64.tbl
 
+pub const open: c_long = 2; // __NR_open
+pub const lseek: c_long = 8; // __NR_lseek
+pub const creat: c_long = 85; // __NR_creat
+pub const ftruncate: c_long = 77; // __NR_ftruncate
 pub const epoll_wait: c_long = 232; // __NR_epoll_wait
 pub const epoll_ctl: c_long = 233; // __NR_epoll_ctl
 pub const epoll_create1: c_long = 291; // __NR_epoll_create1
@@ -245,13 +249,11 @@ pub const epoll_create1: c_long = 291; // __NR_epoll_create1
 
 pub const __NR_read: c_long = 0;
 pub const __NR_write: c_long = 1;
-pub const __NR_open: c_long = 2;
 pub const __NR_close: c_long = 3;
 pub const __NR_stat: c_long = 4;
 pub const __NR_fstat: c_long = 5;
 pub const __NR_lstat: c_long = 6;
 pub const __NR_poll: c_long = 7;
-pub const __NR_lseek: c_long = 8;
 pub const __NR_mmap: c_long = 9;
 pub const __NR_mprotect: c_long = 10;
 pub const __NR_munmap: c_long = 11;
@@ -320,7 +322,6 @@ pub const __NR_flock: c_long = 73;
 pub const __NR_fsync: c_long = 74;
 pub const __NR_fdatasync: c_long = 75;
 pub const __NR_truncate: c_long = 76;
-pub const __NR_ftruncate: c_long = 77;
 pub const __NR_getdents: c_long = 78;
 pub const __NR_getcwd: c_long = 79;
 pub const __NR_chdir: c_long = 80;
@@ -328,7 +329,6 @@ pub const __NR_fchdir: c_long = 81;
 pub const __NR_rename: c_long = 82;
 pub const __NR_mkdir: c_long = 83;
 pub const __NR_rmdir: c_long = 84;
-pub const __NR_creat: c_long = 85;
 pub const __NR_link: c_long = 86;
 pub const __NR_unlink: c_long = 87;
 pub const __NR_symlink: c_long = 88;

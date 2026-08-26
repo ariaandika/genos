@@ -111,6 +111,14 @@ pub const EPOLLWAKEUP: u32 = 1 << 29;
 pub const EPOLLONESHOT: u32 = 1 << 30;
 pub const EPOLLET: u32 = 1 << 31;
 
+// source: include/uapi/linux/fs.h
+
+pub const SEEK_SET: i32 = 0;
+pub const SEEK_CUR: i32 = 1;
+pub const SEEK_END: i32 = 2;
+pub const SEEK_DATA: i32 = 3;
+pub const SEEK_HOLE: i32 = 4;
+
 // source: include/uapi/linux/mman.h
 
 pub const MAP_SHARED: i32 = 0x01;

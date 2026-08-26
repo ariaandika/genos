@@ -20,6 +20,7 @@ pub struct Error {
 pub(super) enum Kind {
     Open,
     Create,
+    Seek,
     Read,
     Write,
     Rename,
@@ -36,6 +37,7 @@ impl fmt::Display for Error {
         let msg = match kind {
             Kind::Open => "open",
             Kind::Create => "create",
+            Kind::Seek => "seek",
             Kind::Read => "read",
             Kind::Write => "write",
             Kind::Rename => "rename",

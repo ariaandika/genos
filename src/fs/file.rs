@@ -8,7 +8,12 @@ use crate::fs::{Error, Kind, Result};
 use crate::io::{Read, Write};
 use crate::{fd, flags, sys};
 
-/// File handle.
+/// Integer representing file size.
+///
+/// Reference: `off_t(3type)`.
+pub type Off = sys::off_t;
+
+/// Open file.
 #[derive(Debug)]
 pub struct File(OwnedFd);
 
@@ -16,21 +21,37 @@ fd::impl_fd_simple!(File);
 
 impl File {
     /// Opens specified file.
+    ///
+    /// Reference: `open(2)`.
     #[inline]
     pub fn open(path: &CStr, mode: AccessMode) -> Result<Self> {
-        sys::call!(RD, __NR_open, path, mode.0).fd(Kind::Open)
+        sys::call!(RD, open, path, mode.0).fd(Kind::Open)
     }
 
     /// Create file if does not exists, open in write-only mode, and truncate to length 0.
+    ///
+    /// Reference: `creat(2)`.
     #[inline]
     pub fn create(path: &CStr, mode: sys::mode_t) -> Result<Self> {
-        sys::call!(RD, __NR_creat, path, mode).fd(Kind::Create)
+        sys::call!(RD, creat, path, mode).fd(Kind::Create)
+    }
+
+    /// Reposition read/write offset.
+    ///
+    /// Reference: `lseek(2)`.
+    #[inline]
+    pub fn seek(&self, offset: sys::off_t, seek: Seek) -> Result<Off> {
+        sys::call!(RD, lseek, self.as_fd(), offset, seek.0)
+            .io(Kind::Seek)
+            .map(|e| e as _)
     }
 
     /// Truncate file to a size of precisely length bytes.
+    ///
+    /// Reference: `ftruncate(2)`.
     #[inline]
-    pub fn truncate(&self, length: sys::off_t) -> Result<()> {
-        sys::call!(RD, __NR_ftruncate, self.as_fd(), length).e(Kind::Truncate)
+    pub fn truncate(&self, length: Off) -> Result<()> {
+        sys::call!(RD, ftruncate, self.as_fd(), length).e(Kind::Truncate)
     }
 }
 
@@ -127,4 +148,27 @@ impl StatusFlags {
     /// Write operations on the file will complete according to the requirements of synchronized I/O
     /// file integrity completion.
     pub const SYNC: Self = Self(sys::O_SYNC);
+}
+
+// ===== Seek =====
+
+/// File seeking mode.
+///
+/// Reference: `lseek(2)`.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[repr(transparent)]
+pub struct Seek(i32);
+
+impl Seek {
+    /// Set file offset to `offset` bytes.
+    pub const SET: Self = Self(sys::SEEK_SET);
+    /// Set file offset to current location plus offset bytes.
+    pub const CUR: Self = Self(sys::SEEK_CUR);
+    /// Set file offset to the size of the file plus offset bytes.
+    pub const END: Self = Self(sys::SEEK_END);
+    /// Adjust the file offset to the next location in the file greater than or equal to offset
+    /// containing data.
+    pub const DATA: Self = Self(sys::SEEK_DATA);
+    /// Adjust the file offset to the next hole in the file greater than or equal to offset.
+    pub const HOLE: Self = Self(sys::SEEK_HOLE);
 }
