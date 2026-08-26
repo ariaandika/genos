@@ -1,13 +1,6 @@
-//! Owned and borrowed linux file descriptors.
-use core::{ffi, fmt, marker, mem};
+use core::mem;
 
-// ===== types =====
-
-/// Raw file descriptors.
-pub type RawFd = ffi::c_int;
-
-// core::num::niche_types::NotAllOnes<RawFd>;
-type ValidRawFd = RawFd;
+use crate::fd::{BorrowedFd, OwnedFd, RawFd};
 
 // ===== traits =====
 
@@ -29,7 +22,7 @@ pub trait AsFd {
     /// Extracts the raw file descriptor.
     #[inline]
     fn as_raw_fd(&self) -> RawFd {
-        self.as_fd().fd
+        self.as_fd().raw()
     }
 }
 
@@ -45,58 +38,6 @@ pub trait IntoRawFd {
     fn into_raw_fd(self) -> RawFd;
 }
 
-// ===== BorrowedFd =====
-
-/// A borrowed file descriptor.
-///
-/// This has a lifetime parameter to tie it to the lifetime of something that owns the file
-/// descriptor. For the duration of that lifetime, it is guaranteed that nobody will close the file
-/// descriptor.
-///
-/// This uses `repr(transparent)` and has the representation of a host file descriptor, so it can be
-/// used in FFI in places where a file descriptor is passed as an argument, it is not captured or
-/// consumed.
-#[derive(Clone, Copy)]
-#[repr(transparent)]
-pub struct BorrowedFd<'fd> {
-    fd: ValidRawFd,
-    _p: marker::PhantomData<&'fd OwnedFd>,
-}
-
-impl BorrowedFd<'_> {
-    /// Returns a `BorrowedFd` holding the given raw file descriptor.
-    ///
-    /// # Safety
-    ///
-    /// The resource pointed to by `fd` must remain open for the duration of the returned
-    /// `BorrowedFd`.
-    #[inline]
-    pub const unsafe fn borrow_raw(fd: RawFd) -> Self {
-        Self { fd, _p: marker::PhantomData }
-    }
-}
-
-// ===== OwnedFd =====
-
-/// An owned file descriptor.
-///
-/// This closes the file descriptor on drop. It is guaranteed that nobody else will close the file
-/// descriptor.
-///
-/// This uses `repr(transparent)` and has the representation of a host file descriptor, so it can be
-/// used in FFI in places where a file descriptor is passed as a consumed argument or returned as an
-/// owned value.
-#[derive(Debug)]
-#[repr(transparent)]
-pub struct OwnedFd(ValidRawFd);
-
-impl Drop for OwnedFd {
-    #[inline]
-    fn drop(&mut self) {
-        crate::sys::call!(RD, __NR_close, self.0);
-    }
-}
-
 // ===== impls =====
 
 impl FromRawFd for RawFd {
@@ -109,7 +50,7 @@ impl FromRawFd for RawFd {
 impl FromRawFd for OwnedFd {
     #[inline]
     unsafe fn from_raw_fd(fd: RawFd) -> Self {
-        Self(fd)
+        Self::from_raw(fd)
     }
 }
 
@@ -123,7 +64,7 @@ impl AsFd for BorrowedFd<'_> {
 impl AsFd for OwnedFd {
     #[inline]
     fn as_fd(&self) -> BorrowedFd<'_> {
-        unsafe { BorrowedFd::borrow_raw(self.0) }
+        unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
     }
 }
 
@@ -137,13 +78,7 @@ impl IntoRawFd for RawFd {
 impl IntoRawFd for OwnedFd {
     #[inline]
     fn into_raw_fd(self) -> RawFd {
-        mem::ManuallyDrop::new(self).0
-    }
-}
-
-impl fmt::Debug for BorrowedFd<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("BorrowedFd").field(&self.fd).finish()
+        mem::ManuallyDrop::new(self).raw()
     }
 }
 

@@ -280,6 +280,7 @@ pub use crate::sys::asm_generic::*;
 pub const sys_read: c_long = 0;
 pub const sys_write: c_long = 1;
 pub const sys_open: c_long = 2;
+pub const sys_close: c_long = 3;
 pub const sys_lseek: c_long = 8;
 pub const sys_pread64: c_long = 17;
 pub const sys_pwrite64: c_long = 18;
@@ -301,7 +302,6 @@ pub const epoll_create1: c_long = 291; // __NR_epoll_create1
 // replaced prefix `sys_` with `__NR_`
 
 pub const __NR_read: c_long = 0;
-pub const __NR_close: c_long = 3;
 pub const __NR_stat: c_long = 4;
 pub const __NR_fstat: c_long = 5;
 pub const __NR_lstat: c_long = 6;
