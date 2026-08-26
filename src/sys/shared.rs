@@ -7,6 +7,13 @@ use crate::sys;
 
 pub const SCM_MAX_FD: i32 = 253;
 
+// source: include/linux/splice.h
+
+pub const SPLICE_F_MOVE: u32 = 0x01;
+pub const SPLICE_F_NONBLOCK: u32 = 0x02;
+pub const SPLICE_F_MORE: u32 = 0x04;
+pub const SPLICE_F_GIFT: u32 = 0x08;
+
 // source: include/linux/net.h
 
 pub const SOCK_STREAM: i32 = 1;

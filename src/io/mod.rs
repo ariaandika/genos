@@ -16,6 +16,8 @@ mod read;
 mod write;
 mod stream;
 
+pub mod splice;
+
 /// Write to standard output with a newline.
 #[macro_export]
 macro_rules! println {

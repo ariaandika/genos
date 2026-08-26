@@ -41,6 +41,18 @@ impl<T> IntoArg for &mut T {
     }
 }
 
+impl<T> IntoArg for Option<&T> {
+    fn into_arg(self) -> usize {
+        self.map_or(0, <_>::into_arg)
+    }
+}
+
+impl<T> IntoArg for Option<&mut T> {
+    fn into_arg(self) -> usize {
+        self.map_or(0, <_>::into_arg)
+    }
+}
+
 impl<T> IntoArg for &[T] {
     fn into_arg(self) -> usize {
         self.as_ptr() as _
