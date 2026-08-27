@@ -8,7 +8,7 @@ use crate::fs::{Error, Kind, Result};
 use crate::io::{Offset, Read, Write};
 use crate::{fd, flags, sys};
 
-/// Open file.
+/// Open file descriptor.
 #[derive(Debug)]
 pub struct File(OwnedFd);
 
@@ -16,6 +16,8 @@ fd::impl_fd_simple!(File);
 
 impl File {
     /// Opens specified file.
+    ///
+    /// [`AccessMode`] can be ORed with [`OpenFlags`].
     ///
     /// Reference: `open(2)`.
     #[inline]
@@ -60,13 +62,14 @@ impl Write for File {
 
 // ===== AccessMode =====
 
-/// File accessing mode.
+/// [`File::open`] access mode.
+///
+/// Reference: `open(2)`.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct AccessMode(i32);
 
-flags::impl_bitops_simple!(AccessMode, CreateFlags);
-flags::impl_bitops_simple!(AccessMode, StatusFlags);
+flags::impl_bitops_simple!(AccessMode, OpenFlags);
 
 impl AccessMode {
     /// Open file in read-only mode.
@@ -77,18 +80,19 @@ impl AccessMode {
     pub const RDWR: Self = Self(sys::O_RDWR);
 }
 
-// ===== CreateFlags =====
+// ===== OpenFlags =====
 
-/// File creation flags.
+/// [`File::open`] flags.
+///
+/// Reference: `open(2)`.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
-pub struct CreateFlags(i32);
+pub struct OpenFlags(i32);
 
-flags::impl_bitops_simple!(CreateFlags);
-flags::impl_bitops_simple!(CreateFlags, AccessMode);
-flags::impl_bitops_simple!(CreateFlags, StatusFlags);
+flags::impl_bitops_simple!(OpenFlags);
+flags::impl_bitops_simple!(OpenFlags, AccessMode, Output = AccessMode);
 
-impl CreateFlags {
+impl OpenFlags {
     /// If path does not exist, create it as a regular file.
     pub const CREAT: Self = Self(sys::O_CREAT);
     /// Enable the close-on-exec flag for the new file descriptor.
@@ -112,20 +116,8 @@ impl CreateFlags {
     pub const TRUNC: Self = Self(sys::O_TRUNC);
 }
 
-// ===== StatusFlags =====
-
-/// File status flags.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-#[repr(transparent)]
-pub struct StatusFlags(i32);
-
-flags::impl_bitops_simple!(StatusFlags);
-
-impl StatusFlags {
+impl OpenFlags {
     /// The file is opened in append mode.
-    ///
-    /// Before each `write(2)`, the file offset is positioned at the end of the file, as if with
-    /// `lseek(2)`.
     pub const APPEND: Self = Self(sys::O_APPEND);
     /// Enable signal-driven I/O: generate a signal (SIGIO by default) when input or output becomes
     /// possible on this file descriptor.
