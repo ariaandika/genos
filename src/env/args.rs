@@ -32,8 +32,6 @@ impl<'c> Args<'c> {
     pub const unsafe fn from_slice_with_nul_unchecked<'a>(
         slice: &'a [Option<&'c Char>],
     ) -> &'a Args<'c> {
-        #[cfg(debug_assertions)]
-        debug_validate(slice);
         unsafe { &*(slice as *const _ as *const Self) }
     }
 
@@ -61,16 +59,6 @@ impl<'c> Args<'c> {
     pub fn iter(&self) -> slice::Iter<'_, &'c Char> {
         self.as_slice().iter()
     }
-}
-
-#[cfg(debug_assertions)]
-const fn debug_validate(args: &[Option<&Char>]) {
-    let mut i = 0;
-    while i < args.len() - 1 {
-        debug_assert!(args[i].is_some(), "`Args::from_raw_parts` contains null pointer");
-        i += 1;
-    }
-    debug_assert!(args[i].is_none(), "`Args::from_raw_parts` is not null terminated");
 }
 
 impl fmt::Debug for Args<'_> {

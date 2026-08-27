@@ -3,10 +3,14 @@
 #![warn(
     missing_docs,
     missing_debug_implementations,
-    clippy::todo, // for longterm use `unimplemented!()`
-    clippy::use_debug,
     clippy::dbg_macro,
-    clippy::explicit_auto_deref,
+    clippy::expect_used,
+    clippy::indexing_slicing,
+    clippy::panic,
+    clippy::string_slice,
+    clippy::todo,
+    clippy::unwrap_used,
+    clippy::use_debug
 )]
 #![allow(clippy::module_inception, clippy::new_without_default, clippy::len_without_is_empty)]
 
