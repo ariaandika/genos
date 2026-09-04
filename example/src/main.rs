@@ -47,13 +47,21 @@ impl<E: fmt::Display> From<E> for Error {
 #[unsafe(naked)]
 #[unsafe(no_mangle)]
 unsafe extern "C" fn _start() -> ! {
-    // assumes that memory is laid out according to the operating system convention for starting a
-    // new program.
     core::arch::naked_asm!(
-        "mov rdi, rsp", // pass the incoming `rsp` as the arg to `init`.
-        "push rbp",     // set the return address to zero.
-        "jmp {entry}",  // jump to `entry`.
-        entry = sym init,
+        // `rsp` contains the initial stack pointer
+        // `rdi` is the first argument of a function based on System V AMD64 ABI
+        "mov rdi, rsp",
+        // because `jmp` is used, `call` requirement must be satisfied
+        //
+        // x86-64 System V ABI states that the stack pointer (`rsp`) must be aligned to a
+        // 16-byte boundary right before a `call` instruction is executed
+        //
+        // following instruction will shifts the stack alignment by 8 bytes, which satisfies the
+        // `call` requirement
+        "push rbp",
+        // `jmp` instead of `call`
+        "jmp {}",
+        sym init,
     )
 }
 
@@ -80,8 +88,13 @@ fn panic_me(info: &core::panic::PanicInfo) -> ! {
 #[unsafe(no_mangle)]
 extern "C" fn rust_eh_personality() {}
 
+// rust `core` module uses some functions from `libc`
 #[unsafe(no_mangle)]
-unsafe extern "C" fn memset(ptr: *mut core::ffi::c_void, val: i32, n: usize) -> *mut core::ffi::c_void {
+unsafe extern "C" fn memset(
+    ptr: *mut core::ffi::c_void,
+    val: i32,
+    n: usize,
+) -> *mut core::ffi::c_void {
     unsafe { core::ptr::write_bytes(ptr, val as u8, n) };
     ptr
 }
