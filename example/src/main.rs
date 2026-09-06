@@ -1,8 +1,10 @@
 #![no_std]
 #![no_main]
-use core::fmt;
-
+#![allow(unsafe_op_in_unsafe_fn)]
+use genos::elf::types::{DynTag, Elf64_Dyn, Elf64_Sym, PType};
+use genos::elf::{ElfFile, gnu};
 use genos::env::{Args, Vars};
+use genos::ffi::{self, Char};
 use genos::process;
 
 macro_rules! print {
@@ -19,31 +21,7 @@ macro_rules! println {
     }};
 }
 
-fn start(args: &Args, vars: Vars) -> Result<(), Error> {
-    print!("$");
-    for arg in args {
-        print!(" {arg:?}");
-    }
-    println!();
-
-    for var in vars {
-        println!("> {var:?}");
-    }
-
-    Ok(())
-}
-
-struct Error;
-
-impl<E: fmt::Display> From<E> for Error {
-    fn from(value: E) -> Self {
-        println!("{value}");
-        Self
-    }
-}
-
-// ===== extern =====
-
+// naked function because compiler generate function prologue that pushes old base pointer
 #[unsafe(naked)]
 #[unsafe(no_mangle)]
 unsafe extern "C" fn _start() -> ! {
@@ -65,22 +43,164 @@ unsafe extern "C" fn _start() -> ! {
     )
 }
 
-fn init(stack: *mut usize) -> ! {
-    let status = unsafe {
-        let argc = *stack as i32;
-        let argv = stack.add(1).cast::<*const i8>();
-        let envp = argv.add(argc as usize + 1);
-        let args = Args::from_raw_parts(argc, argv);
-        let vars = Vars::from_raw(envp);
-        start(args, vars).is_err() as _
+unsafe extern "C" fn init(stack: *mut usize) -> ! {
+    let argc = *stack as i32;
+    let argv = stack.add(1).cast::<*const i8>();
+    let envp = argv.add(argc as usize + 1);
+    let args = Args::from_raw_parts(argc, argv);
+    let vars = Vars::from_raw(envp);
+
+    print!("$");
+    for arg in args {
+        print!(" {arg:?}");
+    }
+    println!();
+    for var in vars {
+        println!("> {var:?}");
+    }
+
+    let mut envp = stack.add(1 + *stack + 1);
+    while *envp != 0 {
+        envp = envp.add(1);
+    }
+
+    let auxv = envp.add(1).cast::<(usize, usize)>();
+    let status = match (&*auxv).0 {
+        0 => 2,
+        33 => {
+            let vdso_base = (&*auxv).1 as _;
+            let sym = match find_vdso(vdso_base, c"__vdso_getrandom".into()) {
+                Ok(ok) => ok,
+                Err(err) => {
+                    println!("Lmao {err}");
+                    process::_exit(2);
+                }
+            };
+            let getrandom = core::mem::transmute::<usize, VdsoGetRandom>(
+                sym.st_value as usize + vdso_base as usize,
+            );
+            let mut buf = [0; 8];
+            println!("INIT: {buf:?}");
+            let res = getrandom(buf.as_mut_ptr(), buf.len(), 0);
+            assert_ne!(res, -1);
+            println!("RANDOM: {buf:?}");
+            0
+        }
+        _ => 2,
     };
     process::_exit(status)
 }
 
+type VdsoGetRandom = extern "C" fn(*mut u8, usize, u32) -> isize;
+
+unsafe fn find_vdso(vdso_base: *const u64, target: &ffi::Char) -> Result<Elf64_Sym, &'static str> {
+    // the base pointer
+    let elf = ElfFile::new(&*vdso_base.cast());
+
+    // search phdr that contains dynamic linking
+    let load = elf
+        .phdrs()
+        .iter()
+        .find(|phdr| phdr.p_type == PType::LOAD)
+        .ok_or("no `phdr` with PT_LOAD")?;
+    assert_eq!(load.p_vaddr, 0);
+
+    // search phdr that contains dynamic linking
+    let dynamics = elf
+        .phdrs()
+        .iter()
+        .find_map(|phdr| elf.as_dynamic(phdr))
+        .ok_or("no `phdr` with dynamic section")?;
+
+    // search for dynamic linking symtab and strtab
+    let mut symtab: Option<&Elf64_Sym> = None;
+    let mut syment: Option<usize> = None;
+    let mut strtab: Option<&Char> = None;
+    let mut strsz: Option<usize> = None;
+    let mut hash: Option<&u32> = None;
+
+    for Elf64_Dyn { d_tag, d_un } in dynamics {
+        let value = *d_un as usize;
+        match *d_tag {
+            DynTag::NULL => break,
+            DynTag::STRTAB => strtab = Some(&*elf.as_ptr().byte_add(value).cast()),
+            DynTag::SYMTAB => symtab = Some(&*elf.as_ptr().byte_add(value).cast()),
+            DynTag::STRSZ => strsz = Some(value),
+            DynTag::SYMENT => syment = Some(value),
+            DynTag::GNU_HASH => hash = Some(&*elf.as_ptr().byte_add(value).cast()),
+            _ => {}
+        }
+    }
+
+    let strtab = strtab.ok_or("no strtab")?;
+    let _strsz = strsz.ok_or("no strsz")?;
+    let symtab = symtab.ok_or("no symtab")?;
+    let _syment = syment.ok_or("no syment")?;
+
+    let hash_table = gnu::GNUHashTable::from_ptr(hash.ok_or("no GNU hash")?);
+    let buckets = hash_table.buckets();
+
+    let hash = gnu::gnu_hash_cstr(target);
+
+    // bloom filter
+    {
+        let bloom_idx = (hash / 64) % hash_table.bloom_size();
+        let word = hash_table.blooms()[bloom_idx as usize];
+        let bit1 = hash & 63;
+        let bit2 = (hash >> hash_table.bloom_shift()) & 63;
+        let mask = (1u64 << bit1) | (1u64 << bit2);
+        let ok = (word & mask) == mask;
+        if !ok {
+            return Err("symbol bloom filter false");
+        }
+    }
+
+    unsafe fn next<T>(elem: &T, n: usize) -> &T {
+        &*(elem as *const T).add(n)
+    }
+
+    fn strcmp(s1: &Char, s2: &Char) -> bool {
+        unsafe {
+            let mut s1 = s1.as_ptr();
+            let mut s2 = s2.as_ptr();
+            while *s1 == *s2 {
+                if (*s1 & *s2) == 0 {
+                    return *s1 == *s2;
+                }
+                s1 = s1.add(1);
+                s2 = s2.add(1);
+            }
+            false
+        }
+    }
+
+    let chains = hash_table.chain_ptr();
+
+    let bucket_i = hash % hash_table.nbuckets();
+    let mut symtab_i = *buckets.as_ptr().add(bucket_i as usize);
+
+    loop {
+        let sym = next(symtab, symtab_i as _);
+        let name = next(strtab, sym.st_name as usize);
+        let chain = chains.add((symtab_i - hash_table.symoffset()) as usize);
+
+        if (*chain | 1) == (hash | 1) && strcmp(name, target) {
+            return Ok(sym.clone());
+        };
+
+        if *chain & 1 != 0 {
+            return Err("target symbol not found");
+        }
+        symtab_i += 1;
+    }
+}
+
+// ===== extern =====
+
 #[cfg(not(test))]
 #[panic_handler]
 fn panic_me(info: &core::panic::PanicInfo) -> ! {
-    let at = fmt::from_fn(|f| info.location().map_or(Ok(()), |l| write!(f, " at {l}")));
+    let at = core::fmt::from_fn(|f| info.location().map_or(Ok(()), |l| write!(f, " at {l}")));
     println!("Thread panicked{at}: {}", info.message());
     process::_exit(101)
 }
@@ -88,13 +208,19 @@ fn panic_me(info: &core::panic::PanicInfo) -> ! {
 #[unsafe(no_mangle)]
 extern "C" fn rust_eh_personality() {}
 
-// rust `core` module uses some functions from `libc`
+#[cfg(debug_assertions)] // `--release` seems work fine
 #[unsafe(no_mangle)]
 unsafe extern "C" fn memset(
     ptr: *mut core::ffi::c_void,
     val: i32,
     n: usize,
 ) -> *mut core::ffi::c_void {
-    unsafe { core::ptr::write_bytes(ptr, val as u8, n) };
+    let mut p = ptr.cast::<u8>();
+    for _ in 0..n {
+        unsafe {
+            p.write(val as u8);
+            p = p.add(1);
+        }
+    }
     ptr
 }

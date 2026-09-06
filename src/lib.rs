@@ -21,6 +21,7 @@ pub mod fd;
 pub mod ffi;
 pub mod flags;
 
+pub mod elf;
 pub mod env;
 pub mod event;
 pub mod fs;
