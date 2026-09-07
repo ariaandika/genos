@@ -100,17 +100,15 @@ impl GNUHashTable {
     /// Returns the blooms as slice.
     #[inline]
     pub const fn buckets(&self) -> &[u32] {
-        let blooms_off = (self.bloom_size * 2) as usize;
-        unsafe {
-            slice::from_raw_parts(self.as_ptr().add(4 + blooms_off).cast(), self.nbuckets as usize)
-        }
+        let off = 4 + (self.bloom_size * 2) as usize;
+        unsafe { slice::from_raw_parts(self.as_ptr().add(off).cast(), self.nbuckets as usize) }
     }
 
-    /// Returns the chains first element pointer.
+    /// Returns reference to the chains first element.
     #[inline]
-    pub const fn chain_ptr(&self) -> *const u32 {
+    pub const fn chains(&self) -> &u32 {
         let off = 4 + ((self.bloom_size * 2) + self.nbuckets) as usize;
-        unsafe { self.as_ptr().add(off).cast() }
+        unsafe { &*self.as_ptr().add(off).cast() }
     }
 }
 

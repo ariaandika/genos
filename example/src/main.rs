@@ -1,10 +1,12 @@
 #![no_std]
 #![no_main]
 #![allow(unsafe_op_in_unsafe_fn)]
+use genos::elf::gnu::GNUHashTable;
 use genos::elf::types::{DynTag, Elf64_Dyn, Elf64_Sym, PType};
 use genos::elf::{ElfFile, gnu};
 use genos::env::{AuxType, Stack};
-use genos::ffi::{self, Char};
+use genos::error::ErrCode;
+use genos::ffi::Char;
 use genos::process;
 
 macro_rules! print {
@@ -56,34 +58,24 @@ unsafe extern "C" fn init(stack: &Stack) -> ! {
         println!("> {var:?}");
     }
 
-    let auxv = envs.into_auxv();
-    let mut getrandom = None;
+    // ===== auxv =====
 
+    let auxv = envs.into_auxv();
+    let mut vdso_base = None;
     for aux in auxv {
         println!("{aux:?}");
         if aux.ty() == AuxType::SYSINFO_EHDR {
-            let vdso_base = aux.value() as _;
-            let sym = match find_vdso(vdso_base, c"__vdso_getrandom".into()) {
-                Ok(ok) => ok,
-                Err(err) => {
-                    println!("Lmao {err}");
-                    process::_exit(2);
-                }
-            };
-            getrandom = Some(core::mem::transmute::<usize, VdsoGetRandom>(
-                sym.st_value as usize + vdso_base as usize,
-            ));
+            vdso_base = Some(aux.value());
         }
     }
 
-    if let Some(getrandom) = getrandom {
-        let mut buf = [0; 8];
-        println!("INIT: {buf:?}");
-        let res = getrandom(buf.as_mut_ptr(), buf.len(), 0);
-        assert_ne!(res, -1);
-        println!("RANDOM: {buf:?}");
-    } else {
-        println!("`getrandom` vdso is not available");
+    // ===== vdso =====
+
+    match vdso_base {
+        Some(vdso_base) => if let Err(err) = vdso(vdso_base) {
+            println!("vdso inspection failed: {err}")
+        },
+        _ => println!("vdso is not available")
     }
 
     process::_exit(0)
@@ -91,11 +83,9 @@ unsafe extern "C" fn init(stack: &Stack) -> ! {
 
 type VdsoGetRandom = extern "C" fn(*mut u8, usize, u32) -> isize;
 
-unsafe fn find_vdso(vdso_base: *const u64, target: &ffi::Char) -> Result<Elf64_Sym, &'static str> {
-    // the base pointer
-    let elf = ElfFile::new(&*vdso_base.cast());
+unsafe fn vdso(vdso_base: usize) -> Result<(), &'static str> {
+    let elf = ElfFile::new(&*(vdso_base as *const _));
 
-    // search phdr that contains dynamic linking
     let load = elf
         .phdrs()
         .iter()
@@ -103,17 +93,17 @@ unsafe fn find_vdso(vdso_base: *const u64, target: &ffi::Char) -> Result<Elf64_S
         .ok_or("no `phdr` with PT_LOAD")?;
     assert_eq!(load.p_vaddr, 0);
 
-    // search phdr that contains dynamic linking
+    // search phdr for the dynamic linking segment (PT_DYNAMIC)
     let dynamics = elf
         .phdrs()
         .iter()
         .find_map(|phdr| elf.as_dynamic(phdr))
         .ok_or("no `phdr` with dynamic section")?;
 
-    // search for dynamic linking symtab and strtab
+    // search for dynamic linking symtab, strtab, and gnu hash table
     let mut symtab: Option<&Elf64_Sym> = None;
     let mut strtab: Option<&Char> = None;
-    let mut hash: Option<&u32> = None;
+    let mut hash_table: Option<&u32> = None;
 
     for Elf64_Dyn { d_tag, d_un } in dynamics {
         let value = *d_un as usize;
@@ -121,58 +111,98 @@ unsafe fn find_vdso(vdso_base: *const u64, target: &ffi::Char) -> Result<Elf64_S
             DynTag::NULL => break,
             DynTag::STRTAB => strtab = Some(&*elf.as_ptr().byte_add(value).cast()),
             DynTag::SYMTAB => symtab = Some(&*elf.as_ptr().byte_add(value).cast()),
-            DynTag::GNU_HASH => hash = Some(&*elf.as_ptr().byte_add(value).cast()),
+            DynTag::GNU_HASH => hash_table = Some(&*elf.as_ptr().byte_add(value).cast()),
             _ => {}
         }
     }
 
-    let strtab = strtab.ok_or("no strtab")?;
-    let symtab = symtab.ok_or("no symtab")?;
+    let hash_table = GNUHashTable::from_ptr(hash_table.ok_or("no GNU hash table")?);
+    let search = VdsoSearch {
+        symtab: symtab.ok_or("no symtab")?,
+        strtab: strtab.ok_or("no strtab")?,
+        hash_table,
+    };
 
-    let hash_table = gnu::GNUHashTable::from_ptr(hash.ok_or("no GNU hash")?);
-    let buckets = hash_table.buckets();
-    let hash = gnu::gnu_hash_cstr(target);
-    if !hash_table.bloom_filter(hash) {
-        return Err("symbol bloom filter false");
+    let Some(sym) = search.search_symbol(c"__vdso_getrandom".into()) else {
+        return Err("`getrandom` vdso not available")
+    };
+
+    // ===== use the vdso =====
+
+    let getrandom = core::mem::transmute::<usize, VdsoGetRandom>(
+        sym.st_value as usize + elf.as_ptr() as usize,
+    );
+    let mut buf = [0; 8];
+    let res = getrandom(buf.as_mut_ptr(), buf.len(), 0);
+    if res < 0 {
+        panic!("cannot perform `getrandom`: {}", ErrCode::new(-res as _));
     }
+    println!("RANDOM: {buf:?}");
+    Ok(())
+}
 
-    unsafe fn next<T>(elem: &T, n: usize) -> &T {
-        &*(elem as *const T).add(n)
-    }
+struct VdsoSearch<'a> {
+    symtab: &'a Elf64_Sym,
+    strtab: &'a Char,
+    hash_table: &'a GNUHashTable,
+}
 
-    fn strcmp(s1: &Char, s2: &Char) -> bool {
-        unsafe {
-            let mut s1 = s1.as_ptr();
-            let mut s2 = s2.as_ptr();
-            while *s1 == *s2 {
-                if (*s1 & *s2) == 0 {
-                    return *s1 == *s2;
-                }
-                s1 = s1.add(1);
-                s2 = s2.add(1);
+impl<'a> VdsoSearch<'a> {
+    fn search_symbol(&self, name: &Char) -> Option<&Elf64_Sym> {
+        // hash table lookup
+        let hash = gnu::gnu_hash_cstr(name);
+        if !self.hash_table.bloom_filter(hash) {
+            // fast filter
+            return None;
+        }
+
+        // grab the bucket value, it contains index to symtab
+        let bucket_i = hash % self.hash_table.nbuckets();
+        let mut symtab_i = self.hash_table.buckets()[bucket_i as usize];
+
+        // iterate hash entry chains linearly
+        let chains = self.hash_table.chains();
+        loop {
+            let chain = nth(chains, symtab_i - self.hash_table.symoffset());
+
+            // chain least significant bit indicate the end of the chain
+            if *chain & 1 != 0 {
+                return None;
             }
-            false
+
+            // compare the hash integer before strcmp for fast filter
+            if (*chain | 1) == (hash | 1) {
+                let sym = nth(self.symtab, symtab_i);
+                let entry_name = nth(self.strtab, sym.st_name);
+
+                if strcmp(entry_name, name) {
+                    return Some(sym);
+                }
+            };
+
+            symtab_i += 1;
         }
     }
+}
 
-    let chains = hash_table.chain_ptr();
+// ===== helper functions =====
 
-    let bucket_i = hash % hash_table.nbuckets();
-    let mut symtab_i = *buckets.as_ptr().add(bucket_i as usize);
+fn nth<T>(elem: &T, n: u32) -> &T {
+    unsafe { &*(elem as *const T).add(n as usize) }
+}
 
-    loop {
-        let sym = next(symtab, symtab_i as _);
-        let name = next(strtab, sym.st_name as usize);
-        let chain = chains.add((symtab_i - hash_table.symoffset()) as usize);
-
-        if (*chain | 1) == (hash | 1) && strcmp(name, target) {
-            return Ok(sym.clone());
-        };
-
-        if *chain & 1 != 0 {
-            return Err("target symbol not found");
+fn strcmp(s1: &Char, s2: &Char) -> bool {
+    unsafe {
+        let mut s1 = s1.as_ptr();
+        let mut s2 = s2.as_ptr();
+        while *s1 == *s2 {
+            if (*s1 & *s2) == 0 {
+                return *s1 == *s2;
+            }
+            s1 = s1.add(1);
+            s2 = s2.add(1);
         }
-        symtab_i += 1;
+        false
     }
 }
 
