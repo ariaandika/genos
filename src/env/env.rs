@@ -1,6 +1,7 @@
 use core::{fmt, ops};
 
-use crate::{env::aux::AuxvIter, ffi::Char};
+use crate::env::aux::AuxvIter;
+use crate::ffi::Char;
 
 // ===== Env =====
 

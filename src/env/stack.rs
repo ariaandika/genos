@@ -1,6 +1,6 @@
 use core::fmt;
 
-use crate::env::{Args, EnvIter, AuxvIter};
+use crate::env::{Args, AuxvIter, EnvIter};
 
 /// Initial stack memory.
 ///
