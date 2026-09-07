@@ -112,9 +112,7 @@ unsafe fn find_vdso(vdso_base: *const u64, target: &ffi::Char) -> Result<Elf64_S
 
     // search for dynamic linking symtab and strtab
     let mut symtab: Option<&Elf64_Sym> = None;
-    let mut syment: Option<usize> = None;
     let mut strtab: Option<&Char> = None;
-    let mut strsz: Option<usize> = None;
     let mut hash: Option<&u32> = None;
 
     for Elf64_Dyn { d_tag, d_un } in dynamics {
@@ -123,34 +121,19 @@ unsafe fn find_vdso(vdso_base: *const u64, target: &ffi::Char) -> Result<Elf64_S
             DynTag::NULL => break,
             DynTag::STRTAB => strtab = Some(&*elf.as_ptr().byte_add(value).cast()),
             DynTag::SYMTAB => symtab = Some(&*elf.as_ptr().byte_add(value).cast()),
-            DynTag::STRSZ => strsz = Some(value),
-            DynTag::SYMENT => syment = Some(value),
             DynTag::GNU_HASH => hash = Some(&*elf.as_ptr().byte_add(value).cast()),
             _ => {}
         }
     }
 
     let strtab = strtab.ok_or("no strtab")?;
-    let _strsz = strsz.ok_or("no strsz")?;
     let symtab = symtab.ok_or("no symtab")?;
-    let _syment = syment.ok_or("no syment")?;
 
     let hash_table = gnu::GNUHashTable::from_ptr(hash.ok_or("no GNU hash")?);
     let buckets = hash_table.buckets();
-
     let hash = gnu::gnu_hash_cstr(target);
-
-    // bloom filter
-    {
-        let bloom_idx = (hash / 64) % hash_table.bloom_size();
-        let word = hash_table.blooms()[bloom_idx as usize];
-        let bit1 = hash & 63;
-        let bit2 = (hash >> hash_table.bloom_shift()) & 63;
-        let mask = (1u64 << bit1) | (1u64 << bit2);
-        let ok = (word & mask) == mask;
-        if !ok {
-            return Err("symbol bloom filter false");
-        }
+    if !hash_table.bloom_filter(hash) {
+        return Err("symbol bloom filter false");
     }
 
     unsafe fn next<T>(elem: &T, n: usize) -> &T {

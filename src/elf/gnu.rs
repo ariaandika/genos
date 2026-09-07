@@ -87,10 +87,14 @@ impl GNUHashTable {
 }
 
 impl GNUHashTable {
+    const fn blooms_ptr(&self) -> *const u64 {
+        unsafe { self.as_ptr().add(4).cast() }
+    }
+
     /// Returns the blooms as slice.
     #[inline]
     pub const fn blooms(&self) -> &[u64] {
-        unsafe { slice::from_raw_parts(self.as_ptr().add(4).cast(), self.bloom_size as usize) }
+        unsafe { slice::from_raw_parts(self.blooms_ptr(), self.bloom_size as usize) }
     }
 
     /// Returns the blooms as slice.
@@ -107,5 +111,23 @@ impl GNUHashTable {
     pub const fn chain_ptr(&self) -> *const u32 {
         let off = 4 + ((self.bloom_size * 2) + self.nbuckets) as usize;
         unsafe { self.as_ptr().add(off).cast() }
+    }
+}
+
+impl GNUHashTable {
+    /// Returns `true` if given hash may be contained in the table.
+    ///
+    /// Perform a bloom filter on given hash.
+    ///
+    /// The hash for a string can be obtained using [`gnu_hash_cstr`].
+    #[inline]
+    pub const fn bloom_filter(&self, hash: u32) -> bool {
+        let bloom_idx = (hash / 64) % self.bloom_size();
+        // SAFETY: `bloom_idx < self.bloom_size()`
+        let word = unsafe { *self.blooms_ptr().add(bloom_idx as usize) };
+        let bit1 = hash & 63;
+        let bit2 = (hash >> self.bloom_shift()) & 63;
+        let mask = (1u64 << bit1) | (1u64 << bit2);
+        (word & mask) == mask
     }
 }
