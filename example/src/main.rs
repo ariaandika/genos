@@ -3,7 +3,7 @@
 #![allow(unsafe_op_in_unsafe_fn)]
 use genos::elf::types::{DynTag, Elf64_Dyn, Elf64_Sym, PType};
 use genos::elf::{ElfFile, gnu};
-use genos::env::{Args, Vars};
+use genos::env::Stack;
 use genos::ffi::{self, Char};
 use genos::process;
 
@@ -43,28 +43,17 @@ unsafe extern "C" fn _start() -> ! {
     )
 }
 
-unsafe extern "C" fn init(stack: *mut usize) -> ! {
-    let argc = *stack as i32;
-    let argv = stack.add(1).cast::<*const i8>();
-    let envp = argv.add(argc as usize + 1);
-    let args = Args::from_raw_parts(argc, argv);
-    let vars = Vars::from_raw(envp);
-
+unsafe extern "C" fn init(stack: &Stack) -> ! {
     print!("$");
-    for arg in args {
+    for arg in stack.args() {
         print!(" {arg:?}");
     }
     println!();
-    for var in vars {
+    for var in stack.envs() {
         println!("> {var:?}");
     }
 
-    let mut envp = stack.add(1 + *stack + 1);
-    while *envp != 0 {
-        envp = envp.add(1);
-    }
-
-    let auxv = envp.add(1).cast::<(usize, usize)>();
+    let auxv = stack.auxv_ptr().cast::<(usize, usize)>();
     let status = match (&*auxv).0 {
         0 => 2,
         33 => {
