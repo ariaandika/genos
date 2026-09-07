@@ -1,8 +1,11 @@
-use crate::env::{Args, Vars};
+use core::fmt;
+
+use crate::env::{Args, Env, Iter};
 
 /// Initial stack memory.
 ///
 /// This is intended to be used as `&Stack` that points to the initial stack memory.
+#[repr(transparent)]
 pub struct Stack(usize);
 
 impl Stack {
@@ -22,10 +25,10 @@ impl Stack {
         unsafe { Args::from_raw_parts(self.argc(), self.as_ptr().add(1).cast()) }
     }
 
-    /// Returns the environment variables.
+    /// Returns the environment variables iterator.
     #[inline]
-    pub const fn envs(&self) -> Vars {
-        unsafe { Vars::from_raw(self.as_ptr().add(2 + self.0).cast()) }
+    pub const fn envs(&self) -> Iter<'_, Env> {
+        Iter::new(unsafe { self.as_ptr().add(2 + self.0).cast() })
     }
 
     /// Returns the auxiliary vector.
@@ -41,8 +44,8 @@ impl Stack {
     }
 }
 
-impl core::fmt::Debug for Stack {
-    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+impl fmt::Debug for Stack {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("Stack")
             .field("argc", &(self.0 as i32))
             .finish_non_exhaustive()

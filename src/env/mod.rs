@@ -1,8 +1,10 @@
 //! Environment variables.
 pub use args::Args;
-pub use vars::Vars;
+pub use env::Env;
 pub use stack::Stack;
+pub use iter::Iter;
 
 mod args;
-pub mod vars;
+mod env;
 mod stack;
+mod iter;
