@@ -1,6 +1,6 @@
 use core::fmt;
 
-use crate::env::{Args, Env, Iter};
+use crate::env::{Args, EnvIter, AuxvIter};
 
 /// Initial stack memory.
 ///
@@ -27,20 +27,17 @@ impl Stack {
 
     /// Returns the environment variables iterator.
     #[inline]
-    pub const fn envs(&self) -> Iter<'_, Env> {
-        Iter::new(unsafe { self.as_ptr().add(2 + self.0).cast() })
+    pub const fn envs(&self) -> EnvIter<'_, '_> {
+        EnvIter::new(unsafe { &*self.as_ptr().add(2 + self.0).cast() })
     }
 
-    /// Returns the auxiliary vector.
+    /// Returns the auxiliary vector iterator.
+    ///
+    /// Note that this will reiterate environment variables. The iterator can also be obtained from
+    /// [`EnvIter::into_auxv`].
     #[inline]
-    pub const fn auxv_ptr(&self) -> *const usize {
-        unsafe {
-            let mut envp = self.as_ptr().add(2 + self.0);
-            while *envp != 0 {
-                envp = envp.add(1);
-            }
-            envp.add(1)
-        }
+    pub fn auxv(&self) -> AuxvIter<'_> {
+        self.envs().into_auxv()
     }
 }
 

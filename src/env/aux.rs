@@ -30,6 +30,9 @@ impl Auxiliary {
 
 // ===== AuxType =====
 
+// source: include/uapi/linux/auxvec.h
+// source: arch/x86/include/uapi/asm/auxvec.h
+
 /// Auxiliary type.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
@@ -96,4 +99,32 @@ impl AuxType {
     pub const SYSINFO: Self = Self(32);
     /// Address of a page containing the virtual Dynamic Shared Object (vDSO).
     pub const SYSINFO_EHDR: Self = Self(33);
+    /// Minimal stack size for signal delivery.
+    pub const MINSIGSTKSZ: Self = Self(51);
+}
+
+// ===== AuxvIter =====
+
+/// Auxiliary vector iterator.
+#[derive(Debug)]
+pub struct AuxvIter<'a>(&'a Auxiliary);
+
+impl<'a> AuxvIter<'a> {
+    pub(crate) fn new(auxv: &'a Auxiliary) -> Self {
+        Self(auxv)
+    }
+}
+
+impl<'a> Iterator for AuxvIter<'a> {
+    type Item = &'a Auxiliary;
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        let current = self.0;
+        if current.is_null() {
+            return None;
+        }
+        self.0 = unsafe { &*(current as *const Auxiliary).add(1) };
+        Some(current)
+    }
 }

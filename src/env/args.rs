@@ -1,8 +1,9 @@
-use core::{ffi, fmt, slice};
+use core::{ffi, fmt, iter, slice};
 
 use crate::ffi::Char;
 
 /// Command line arguments.
+#[repr(transparent)]
 pub struct Args<'c>([Option<&'c Char>]);
 
 impl<'c> Args<'c> {
@@ -70,12 +71,12 @@ impl fmt::Debug for Args<'_> {
 // ===== Iterator =====
 
 impl<'a, 'c> IntoIterator for &'a Args<'c> {
-    type Item = &'a &'c Char;
+    type Item = &'c Char;
 
-    type IntoIter = slice::Iter<'a, &'c Char>;
+    type IntoIter = iter::Copied<slice::Iter<'a, &'c Char>>;
 
     #[inline]
     fn into_iter(self) -> Self::IntoIter {
-        self.iter()
+        self.as_slice().iter().copied()
     }
 }

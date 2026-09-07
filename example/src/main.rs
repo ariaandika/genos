@@ -3,7 +3,7 @@
 #![allow(unsafe_op_in_unsafe_fn)]
 use genos::elf::types::{DynTag, Elf64_Dyn, Elf64_Sym, PType};
 use genos::elf::{ElfFile, gnu};
-use genos::env::Stack;
+use genos::env::{AuxType, Stack};
 use genos::ffi::{self, Char};
 use genos::process;
 
@@ -49,15 +49,20 @@ unsafe extern "C" fn init(stack: &Stack) -> ! {
         print!(" {arg:?}");
     }
     println!();
-    for var in stack.envs() {
+
+    let mut envs = stack.envs();
+
+    for var in &mut envs {
         println!("> {var:?}");
     }
 
-    let auxv = stack.auxv_ptr().cast::<(usize, usize)>();
-    let status = match (&*auxv).0 {
-        0 => 2,
-        33 => {
-            let vdso_base = (&*auxv).1 as _;
+    let auxv = envs.into_auxv();
+    let mut getrandom = None;
+
+    for aux in auxv {
+        println!("{aux:?}");
+        if aux.ty() == AuxType::SYSINFO_EHDR {
+            let vdso_base = aux.value() as _;
             let sym = match find_vdso(vdso_base, c"__vdso_getrandom".into()) {
                 Ok(ok) => ok,
                 Err(err) => {
@@ -65,19 +70,23 @@ unsafe extern "C" fn init(stack: &Stack) -> ! {
                     process::_exit(2);
                 }
             };
-            let getrandom = core::mem::transmute::<usize, VdsoGetRandom>(
+            getrandom = Some(core::mem::transmute::<usize, VdsoGetRandom>(
                 sym.st_value as usize + vdso_base as usize,
-            );
-            let mut buf = [0; 8];
-            println!("INIT: {buf:?}");
-            let res = getrandom(buf.as_mut_ptr(), buf.len(), 0);
-            assert_ne!(res, -1);
-            println!("RANDOM: {buf:?}");
-            0
+            ));
         }
-        _ => 2,
-    };
-    process::_exit(status)
+    }
+
+    if let Some(getrandom) = getrandom {
+        let mut buf = [0; 8];
+        println!("INIT: {buf:?}");
+        let res = getrandom(buf.as_mut_ptr(), buf.len(), 0);
+        assert_ne!(res, -1);
+        println!("RANDOM: {buf:?}");
+    } else {
+        println!("`getrandom` vdso is not available");
+    }
+
+    process::_exit(0)
 }
 
 type VdsoGetRandom = extern "C" fn(*mut u8, usize, u32) -> isize;
