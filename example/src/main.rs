@@ -6,9 +6,9 @@ use genos::elf::hash::ELFHashTable;
 use genos::elf::types::{DynTag, Elf64_Dyn, Elf64_Sym, PType};
 use genos::elf::{ElfFile, gnu};
 use genos::env::Stack;
-use genos::error::ErrCode;
 use genos::ffi::Char;
 use genos::process;
+use genos::time::TIME_VDSO_SYM;
 
 macro_rules! print {
     ($($tt:tt)*) => {{
@@ -84,8 +84,6 @@ unsafe extern "C" fn init(stack: &Stack) -> ! {
     process::_exit(0)
 }
 
-type VdsoGetRandom = extern "C" fn(*mut u8, usize, u32) -> isize;
-
 unsafe fn vdso(elf: ElfFile) -> Result<(), &'static str> {
     let load = elf
         .phdrs()
@@ -134,20 +132,18 @@ unsafe fn vdso(elf: ElfFile) -> Result<(), &'static str> {
     }
 
     let search = VdsoSearch { symtab, strtab, hash_table };
-    let Some(sym) = search.search_symbol(c"__vdso_getrandom".into()) else {
+    let Some(sym) = search.search_symbol(TIME_VDSO_SYM) else {
         return Err("`getrandom` vdso not available");
     };
 
     // ===== use the vdso =====
 
-    let getrandom = elf.as_ptr().byte_add(sym.st_value as _);
-    let getrandom = core::mem::transmute::<*const _, VdsoGetRandom>(getrandom);
-    let mut buf = [0; 8];
-    let res = getrandom(buf.as_mut_ptr(), buf.len(), 0);
-    if res < 0 {
-        panic!("cannot perform `getrandom`: {}", ErrCode::new(-res as _));
-    }
-    println!("RANDOM: {buf:?}");
+    let ffi = elf.as_ptr().byte_add(sym.st_value as _);
+    let time = core::mem::transmute::<*const _, extern "C" fn(usize) -> usize>(ffi);
+    let time = time(0);
+
+    println!("[TIME]: {time}");
+
     Ok(())
 }
 
@@ -175,11 +171,6 @@ impl<'a> VdsoSearch<'a> {
         loop {
             let chain = nth(chains, symtab_i - self.hash_table.symoffset());
 
-            // chain least significant bit indicate the end of the chain
-            if *chain & 1 != 0 {
-                return None;
-            }
-
             // compare the hash integer before strcmp for fast filter
             if (*chain | 1) == (hash | 1) {
                 let sym = nth(self.symtab, symtab_i);
@@ -188,7 +179,12 @@ impl<'a> VdsoSearch<'a> {
                 if strcmp(entry_name, name) {
                     return Some(sym);
                 }
-            };
+            }
+
+            // chain least significant bit indicate the end of the chain
+            if *chain & 1 != 0 {
+                return None;
+            }
 
             symtab_i += 1;
         }
