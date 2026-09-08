@@ -1,11 +1,12 @@
 //! [`Timerfd`] associated types.
+use core::mem::MaybeUninit;
 use core::time::Duration;
 use core::{fmt, mem, result};
 
 use crate::error::{ErrCode, SysResExt};
 use crate::fd::{AsFd, OwnedFd};
 use crate::time::Clock;
-use crate::{error, fd, flags, sys};
+use crate::{error, fd, flags, io, sys};
 
 // ===== Timerfd =====
 
@@ -69,9 +70,9 @@ impl Timerfd {
     /// Checks the expiration status.
     #[inline]
     pub fn read(&self) -> Result<u64> {
-        let mut n = [0u8; _];
-        sys::call!(__NR_read, self.as_fd(), &mut n, n.len()).e(Kind::Read)?;
-        Ok(u64::from_ne_bytes(n))
+        let mut n = [const { MaybeUninit::uninit() }; size_of::<u64>()];
+        io::read(self, &mut n)?;
+        Ok(unsafe { mem::transmute::<[MaybeUninit<u8>; _], u64>(n) })
     }
 }
 
@@ -134,6 +135,13 @@ enum Kind {
 }
 
 error::impl_error_with_kind!(Error, Kind);
+
+impl From<io::ReadError> for Error {
+    #[inline]
+    fn from(value: io::ReadError) -> Self {
+        Error { kind: Kind::Read, code: value.into() }
+    }
+}
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

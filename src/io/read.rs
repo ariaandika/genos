@@ -5,6 +5,19 @@ use crate::fd::AsFd;
 use crate::io::{IOFlags, IoVecMut, Offset};
 use crate::{error, sys};
 
+/// Read bytes from this fd into the buffer.
+///
+/// On success, the number of bytes read is returned (zero indicates end of file), and the file
+/// position is advanced by this number.
+///
+/// It is not an error if this number is smaller than the number of bytes requested; this may happen
+/// for example because fewer bytes are actually available right now (maybe because end-of-file were
+/// close, or because reading from a pipe, or from a terminal), or because interrupted by a signal.
+#[inline]
+pub fn read<Fd: AsFd>(fd: Fd, buf: &mut [MaybeUninit<u8>]) -> Result<usize, ReadError> {
+    sys::call!(sys_read, fd.as_fd(), &mut *buf, buf.len()).io2::<ReadError>()
+}
+
 /// A readable file descriptor.
 pub trait Read: AsFd {
     /// An error that may occur when reading from this fd.
@@ -12,18 +25,10 @@ pub trait Read: AsFd {
 
     /// Read bytes from this fd into the buffer.
     ///
-    /// On success, the number of bytes read is returned (zero indicates end of file), and the file
-    /// position is advanced by this number.
-    ///
-    /// It is not an error if this number is smaller than the number of bytes requested; this may
-    /// happen for example because fewer bytes are actually available right now (maybe because
-    /// end-of-file were close, or because reading from a pipe, or from a terminal), or because
-    /// interrupted by a signal.
+    /// For more details see [`read`] for more details.
     #[inline]
     fn read(&self, buf: &mut [MaybeUninit<u8>]) -> Result<usize, Self::Error> {
-        sys::call!(sys_read, self.as_fd(), &mut *buf, buf.len())
-            .io2::<ReadError>()
-            .map_err(<_>::into)
+        read(self, buf).map_err(<_>::into)
     }
 
     /// Read bytes from this fd into the buffer at given offset.

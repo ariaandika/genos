@@ -1,11 +1,11 @@
 //! [`Signalfd`] associated types.
-use core::mem::MaybeUninit;
+use core::mem::{self, MaybeUninit};
 use core::{fmt, result};
 
 use crate::error::{ErrCode, SysResExt};
-use crate::fd::{AsFd, OwnedFd};
+use crate::fd::OwnedFd;
 use crate::signal::{Signo, Sigset};
-use crate::{error, fd, flags, sys};
+use crate::{error, fd, flags, io, sys};
 
 // ===== Signalfd =====
 
@@ -25,17 +25,14 @@ impl Signalfd {
     /// Read for pending signal.
     #[inline]
     pub fn read(&self) -> Result<Siginfo> {
-        const LEN: usize = size_of::<Siginfo>();
-        let mut buf = MaybeUninit::<Siginfo>::uninit();
+        let mut buf = [const { MaybeUninit::uninit() }; size_of::<Siginfo>()];
         let mut n = 0;
-        while let Some(rem) = LEN.checked_sub(n)
-            && rem != 0
+        while n < buf.len()
+            && let Some(buf) = buf.get_mut(n..)
         {
-            let ptr = unsafe { buf.as_mut_ptr().byte_add(n) };
-            let read = sys::call!(__NR_read, self.as_fd(), ptr, rem).io(Kind::Read)?;
-            n += read;
+            n += io::read(self, buf)?;
         }
-        Ok(unsafe { buf.assume_init() })
+        Ok(unsafe { mem::transmute::<[MaybeUninit<u8>; _], Siginfo>(buf) })
     }
 }
 
@@ -94,6 +91,13 @@ enum Kind {
 }
 
 error::impl_error_with_kind!(Error, Kind);
+
+impl From<io::ReadError> for Error {
+    #[inline]
+    fn from(value: io::ReadError) -> Self {
+        Self { kind: Kind::Read, code: value.into() }
+    }
+}
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {

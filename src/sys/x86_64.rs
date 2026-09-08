@@ -304,7 +304,6 @@ pub const epoll_create1: c_long = 291; // __NR_epoll_create1
 
 // replaced prefix `sys_` with `__NR_`
 
-pub const __NR_read: c_long = 0;
 pub const __NR_stat: c_long = 4;
 pub const __NR_fstat: c_long = 5;
 pub const __NR_lstat: c_long = 6;
