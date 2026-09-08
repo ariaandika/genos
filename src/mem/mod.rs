@@ -5,8 +5,6 @@ use core::ffi::c_void;
 pub use mmap::Mmap;
 pub use error::OutOfMemory;
 
-#[cfg(feature = "libc")]
-pub mod alloc;
 pub mod mmap;
 mod error;
 
