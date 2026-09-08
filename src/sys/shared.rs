@@ -193,18 +193,6 @@ pub const CLOCK_REALTIME_ALARM: i32 = 8;
 pub const CLOCK_BOOTTIME_ALARM: i32 = 9;
 pub const CLOCK_TAI: i32 = 11;
 
-#[repr(C)]
-pub struct itimerspec {
-    pub it_interval: timespec,
-    pub it_value: timespec,
-}
-
-#[repr(C)]
-pub struct timespec {
-    pub tv_sec: ffi::c_long,
-    pub tv_nsec: ffi::c_long,
-}
-
 // source: include/uapi/linux/timerfd.h
 
 pub const TFD_TIMER_ABSTIME: i32 = 1 << 0;

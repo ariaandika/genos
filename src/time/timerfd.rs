@@ -1,11 +1,10 @@
 //! [`Timerfd`] associated types.
 use core::mem::MaybeUninit;
-use core::time::Duration;
 use core::{fmt, mem, result};
 
 use crate::error::{ErrCode, SysResExt};
 use crate::fd::{AsFd, OwnedFd};
-use crate::time::Clock;
+use crate::time::{Clock, ITimerspec};
 use crate::{error, fd, flags, io, sys};
 
 // ===== Timerfd =====
@@ -41,30 +40,21 @@ impl Timerfd {
     /// time on the timer's clock at the time of the call. An absolute timeout can be selected via
     /// the flags argument.
     #[inline]
-    pub fn set_time(&self, initial: Duration, interval: Duration, flags: TimerFlags) -> Result<()> {
-        let time = sys::itimerspec {
-            // interval timer, after the initial timer
-            it_interval: sys::timespec {
-                tv_sec: interval.as_secs() as _,
-                tv_nsec: interval.subsec_nanos() as _,
-            },
-            // initial timer
-            it_value: sys::timespec {
-                tv_sec: initial.as_secs() as _,
-                tv_nsec: initial.subsec_nanos() as _,
-            },
-        };
-        sys::call!(RD, sys_timerfd_settime, self.as_fd(), flags.0, &time, 0).e(Kind::Set)
+    pub fn set_time(&self, time: &ITimerspec, flags: TimerFlags) -> Result<()> {
+        sys::call!(RD, sys_timerfd_settime, self.as_fd(), flags.0, time, 0).e(Kind::Set)
     }
 
-    /// Returns the current `(initial, interval)` timer.
+    /// Returns the current timer.
+    ///
+    /// The underlying syscall may return error if caller creates `Timerfd` with invalid fd via
+    /// [`FromRawFd::from_raw_fd`][1]. In that case, the returned `ITimerspec` is zeroed.
+    ///
+    /// [1]: crate::fd::FromRawFd::from_raw_fd
     #[inline]
-    pub fn time(&self) -> (Duration, Duration) {
-        let mut time = unsafe { mem::zeroed::<sys::itimerspec>() };
+    pub fn time(&self) -> ITimerspec {
+        let mut time = unsafe { mem::zeroed::<ITimerspec>() };
         sys::call!(sys_timerfd_gettime, self.as_fd(), &mut time);
-        let init = Duration::new(time.it_value.tv_sec as _, time.it_value.tv_nsec as _);
-        let ival = Duration::new(time.it_interval.tv_sec as _, time.it_interval.tv_nsec as _);
-        (init, ival)
+        time
     }
 
     /// Checks the expiration status.
