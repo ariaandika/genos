@@ -5,7 +5,7 @@ use genos::elf::gnu::GNUHashTable;
 use genos::elf::hash::ELFHashTable;
 use genos::elf::types::{DynTag, Elf64_Dyn, Elf64_Sym, PType};
 use genos::elf::{ElfFile, gnu};
-use genos::env::{AuxType, Stack};
+use genos::env::Stack;
 use genos::error::ErrCode;
 use genos::ffi::Char;
 use genos::process;
@@ -62,19 +62,19 @@ unsafe extern "C" fn init(stack: &Stack) -> ! {
     // ===== auxv =====
 
     let auxv = envs.into_auxv();
-    let mut vdso_base = None;
+    let mut elf = None;
     for aux in auxv {
         println!("{aux:?}");
-        if aux.ty() == AuxType::SYSINFO_EHDR {
-            vdso_base = Some(aux.value());
+        if let Some(vdso) = ElfFile::from_aux(aux) {
+            elf = Some(vdso);
         }
     }
 
     // ===== vdso =====
 
-    match vdso_base {
-        Some(vdso_base) => {
-            if let Err(err) = vdso(vdso_base) {
+    match elf {
+        Some(elf) => {
+            if let Err(err) = vdso(elf) {
                 println!("vdso inspection failed: {err}")
             }
         }
@@ -86,9 +86,7 @@ unsafe extern "C" fn init(stack: &Stack) -> ! {
 
 type VdsoGetRandom = extern "C" fn(*mut u8, usize, u32) -> isize;
 
-unsafe fn vdso(vdso_base: usize) -> Result<(), &'static str> {
-    let elf = ElfFile::new(&*(vdso_base as *const _));
-
+unsafe fn vdso(elf: ElfFile) -> Result<(), &'static str> {
     let load = elf
         .phdrs()
         .iter()
@@ -137,14 +135,13 @@ unsafe fn vdso(vdso_base: usize) -> Result<(), &'static str> {
 
     let search = VdsoSearch { symtab, strtab, hash_table };
     let Some(sym) = search.search_symbol(c"__vdso_getrandom".into()) else {
-        return Err("`getrandom` vdso not available")
+        return Err("`getrandom` vdso not available");
     };
 
     // ===== use the vdso =====
 
-    let getrandom = core::mem::transmute::<usize, VdsoGetRandom>(
-        sym.st_value as usize + elf.as_ptr() as usize,
-    );
+    let getrandom = elf.as_ptr().byte_add(sym.st_value as _);
+    let getrandom = core::mem::transmute::<*const _, VdsoGetRandom>(getrandom);
     let mut buf = [0; 8];
     let res = getrandom(buf.as_mut_ptr(), buf.len(), 0);
     if res < 0 {

@@ -1,6 +1,7 @@
 use core::slice;
 
 use crate::elf::types::{Elf64_Dyn, Elf64_Ehdr, Elf64_Phdr, PType};
+use crate::env::{AuxType, Auxiliary};
 
 /// ELF File helper.
 ///
@@ -19,8 +20,25 @@ impl<'a> ElfFile<'a> {
     /// The safest way is to create the reference based on value of auxiliary type
     /// `AT_SYSINFO_EHDR`.
     #[inline]
-    pub unsafe fn new(header: &'a Elf64_Ehdr) -> Self {
+    pub const unsafe fn new(header: &'a Elf64_Ehdr) -> Self {
         Self(header)
+    }
+
+    /// Creates new [`ElfFile`] from [`Auxiliary`].
+    ///
+    /// This can be used when iterating auxiliary vector.
+    ///
+    /// # Safety
+    ///
+    /// This method requires that the auxiliary value contains valid pointer to memory containing
+    /// that represents ELF format.
+    #[inline]
+    pub const unsafe fn from_aux(aux: &'a Auxiliary) -> Option<ElfFile<'a>> {
+        if matches!(aux.ty(), AuxType::SYSINFO_EHDR) {
+            Some(unsafe { Self(&*(aux.value() as *const _)) })
+        } else {
+            None
+        }
     }
 
     /// Returns the internal pointer.
