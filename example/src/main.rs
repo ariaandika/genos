@@ -2,6 +2,7 @@
 #![no_main]
 #![allow(unsafe_op_in_unsafe_fn)]
 use genos::elf::gnu::GNUHashTable;
+use genos::elf::hash::ELFHashTable;
 use genos::elf::types::{DynTag, Elf64_Dyn, Elf64_Sym, PType};
 use genos::elf::{ElfFile, gnu};
 use genos::env::{AuxType, Stack};
@@ -72,10 +73,12 @@ unsafe extern "C" fn init(stack: &Stack) -> ! {
     // ===== vdso =====
 
     match vdso_base {
-        Some(vdso_base) => if let Err(err) = vdso(vdso_base) {
-            println!("vdso inspection failed: {err}")
-        },
-        _ => println!("vdso is not available")
+        Some(vdso_base) => {
+            if let Err(err) = vdso(vdso_base) {
+                println!("vdso inspection failed: {err}")
+            }
+        }
+        _ => println!("vdso is not available"),
     }
 
     process::_exit(0)
@@ -101,14 +104,16 @@ unsafe fn vdso(vdso_base: usize) -> Result<(), &'static str> {
         .ok_or("no `phdr` with dynamic section")?;
 
     // search for dynamic linking symtab, strtab, and gnu hash table
-    let mut symtab: Option<&Elf64_Sym> = None;
-    let mut strtab: Option<&Char> = None;
-    let mut hash_table: Option<&u32> = None;
+    let mut symtab = None::<&Elf64_Sym>;
+    let mut strtab = None::<&Char>;
+    let mut sym_hash = None::<&u32>;
+    let mut hash_table = None::<&u32>;
 
     for Elf64_Dyn { d_tag, d_un } in dynamics {
         let value = *d_un as usize;
         match *d_tag {
             DynTag::NULL => break,
+            DynTag::HASH => sym_hash = Some(&*elf.as_ptr().byte_add(value).cast()),
             DynTag::STRTAB => strtab = Some(&*elf.as_ptr().byte_add(value).cast()),
             DynTag::SYMTAB => symtab = Some(&*elf.as_ptr().byte_add(value).cast()),
             DynTag::GNU_HASH => hash_table = Some(&*elf.as_ptr().byte_add(value).cast()),
@@ -116,13 +121,21 @@ unsafe fn vdso(vdso_base: usize) -> Result<(), &'static str> {
         }
     }
 
+    let symtab = symtab.ok_or("no symtab")?;
+    let strtab = strtab.ok_or("no strtab")?;
     let hash_table = GNUHashTable::from_ptr(hash_table.ok_or("no GNU hash table")?);
-    let search = VdsoSearch {
-        symtab: symtab.ok_or("no symtab")?,
-        strtab: strtab.ok_or("no strtab")?,
-        hash_table,
-    };
 
+    // `DT_HASH` is not always present, in favor of `DT_GNU_HASH`
+    if let Some(sym_hash) = sym_hash {
+        let sym_hash = ELFHashTable::from_raw(sym_hash);
+        let syms = core::slice::from_raw_parts(symtab, sym_hash.nchain() as usize);
+        for sym in syms {
+            let entry_name = nth(strtab, sym.st_name);
+            println!("[SYMBOL]: {entry_name:?}");
+        }
+    }
+
+    let search = VdsoSearch { symtab, strtab, hash_table };
     let Some(sym) = search.search_symbol(c"__vdso_getrandom".into()) else {
         return Err("`getrandom` vdso not available")
     };
