@@ -183,9 +183,15 @@ pub struct signalfd_siginfo {
 
 pub const CLOCK_REALTIME: i32 = 0;
 pub const CLOCK_MONOTONIC: i32 = 1;
+// pub const CLOCK_PROCESS_CPUTIME_ID: i32 = 2;
+// pub const CLOCK_THREAD_CPUTIME_ID: i32 = 3;
+pub const CLOCK_MONOTONIC_RAW: i32 = 4;
+pub const CLOCK_REALTIME_COARSE: i32 = 5;
+pub const CLOCK_MONOTONIC_COARSE: i32 = 6;
 pub const CLOCK_BOOTTIME: i32 = 7;
 pub const CLOCK_REALTIME_ALARM: i32 = 8;
 pub const CLOCK_BOOTTIME_ALARM: i32 = 9;
+pub const CLOCK_TAI: i32 = 11;
 
 #[repr(C)]
 pub struct itimerspec {
