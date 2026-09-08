@@ -275,7 +275,7 @@ pub use crate::sys::asm_generic::*;
 
 // source: arch/x86/entry/syscalls/syscall_64.tbl
 
-// new definitions aboiding `__NR_` prefix which silence unused variable lint
+// new definitions avoiding `__NR_` prefix which silence unused variable lint
 
 pub const sys_read: c_long = 0;
 pub const sys_write: c_long = 1;
@@ -292,6 +292,9 @@ pub const sys_creat: c_long = 85;
 pub const sys_splice: c_long = 275;
 pub const sys_tee: c_long = 276;
 pub const sys_vmsplice: c_long = 278;
+pub const sys_timerfd_create: c_long = 283;
+pub const sys_timerfd_settime: c_long = 286;
+pub const sys_timerfd_gettime: c_long = 287;
 pub const sys_pwritev: c_long = 296;
 pub const sys_preadv2: c_long = 327;
 
@@ -564,11 +567,8 @@ pub const __NR_sync_file_range: c_long = 277;
 pub const __NR_move_pages: c_long = 279;
 pub const __NR_utimensat: c_long = 280;
 pub const __NR_signalfd: c_long = 282;
-pub const __NR_timerfd_create: c_long = 283;
 pub const __NR_eventfd: c_long = 284;
 pub const __NR_fallocate: c_long = 285;
-pub const __NR_timerfd_settime: c_long = 286;
-pub const __NR_timerfd_gettime: c_long = 287;
 pub const __NR_accept4: c_long = 288;
 pub const __NR_signalfd4: c_long = 289;
 pub const __NR_eventfd2: c_long = 290;

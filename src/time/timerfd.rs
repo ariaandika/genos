@@ -4,7 +4,10 @@ use core::{fmt, mem, result};
 
 use crate::error::{ErrCode, SysResExt};
 use crate::fd::{AsFd, OwnedFd};
+use crate::time::Clock;
 use crate::{error, fd, flags, sys};
+
+// ===== Timerfd =====
 
 /// Timer notifications.
 #[derive(Debug)]
@@ -14,9 +17,17 @@ fd::impl_fd_simple!(Timerfd);
 
 impl Timerfd {
     /// Creates new [`Timerfd`].
+    ///
+    /// The `clock` argument must be one of the following:
+    ///
+    /// - [`Clock::REALTIME`]
+    /// - [`Clock::MONOTONIC`]
+    /// - [`Clock::BOOTTIME`]
+    /// - [`Clock::REALTIME_ALARM`]
+    /// - [`Clock::BOOTTIME_ALARM`]
     #[inline]
-    pub fn create(kind: ClockKind, flags: Flags) -> Result<Self> {
-        sys::call!(RD, __NR_timerfd_create, kind.0, flags.0).fd(Kind::Create)
+    pub fn create(clock: Clock, flags: Flags) -> Result<Self> {
+        sys::call!(RD, sys_timerfd_create, i32::from(clock), flags.0).fd(Kind::Create)
     }
 
     /// Arms (starts) or disarms (stops) the timer.
@@ -42,14 +53,14 @@ impl Timerfd {
                 tv_nsec: initial.subsec_nanos() as _,
             },
         };
-        sys::call!(RD, __NR_timerfd_settime, self.as_fd(), flags.0, &time, 0).e(Kind::Set)
+        sys::call!(RD, sys_timerfd_settime, self.as_fd(), flags.0, &time, 0).e(Kind::Set)
     }
 
     /// Returns the current `(initial, interval)` timer.
     #[inline]
     pub fn time(&self) -> (Duration, Duration) {
         let mut time = unsafe { mem::zeroed::<sys::itimerspec>() };
-        sys::call!(__NR_timerfd_gettime, self.as_fd(), &mut time);
+        sys::call!(sys_timerfd_gettime, self.as_fd(), &mut time);
         let init = Duration::new(time.it_value.tv_sec as _, time.it_value.tv_nsec as _);
         let ival = Duration::new(time.it_interval.tv_sec as _, time.it_interval.tv_nsec as _);
         (init, ival)
@@ -62,39 +73,6 @@ impl Timerfd {
         sys::call!(__NR_read, self.as_fd(), &mut n, n.len()).e(Kind::Read)?;
         Ok(u64::from_ne_bytes(n))
     }
-}
-
-// ===== ClockKind =====
-
-/// The clock that is used to mark the progress of the [`Timerfd`].
-#[derive(Debug, Clone, Copy)]
-#[repr(transparent)]
-pub struct ClockKind(i32);
-
-impl ClockKind {
-    /// A settable system-wide real-time clock.
-    pub const REALTIME: Self = Self(sys::CLOCK_REALTIME);
-    /// A nonsettable monotonically increasing clock that measures time from some unspecified point
-    /// in the past that does not change after system startup.
-    pub const MONOTONIC: Self = Self(sys::CLOCK_MONOTONIC);
-    /// Like CLOCK_MONOTONIC, this is a monotonically increasing clock.
-    ///
-    /// However, whereas the [`ClockKind::MONOTONIC`] clock does not measure the time while a system
-    /// is suspended, the [`ClockKind::BOOTTIME`] clock does include the time during which the
-    /// system is suspended. This is useful for applications that need to be suspend-aware.
-    /// [`ClockKind::REALTIME`] is not suitable for such applications, since that clock is affected
-    /// by discontinuous changes to the system clock.
-    pub const BOOTTIME: Self = Self(sys::CLOCK_BOOTTIME);
-    /// This clock is like [`ClockKind::REALTIME`], but will wake the system if it is suspended.
-    ///
-    /// The caller must have the CAP_WAKE_ALARM capability in order to set a timer against this
-    /// clock.
-    pub const REALTIME_ALARM: Self = Self(sys::CLOCK_REALTIME_ALARM);
-    /// This clock is like [`ClockKind::BOOTTIME`], but will wake the system if it is suspended.
-    ///
-    /// The caller must have the CAP_WAKE_ALARM capability in order to set a timer against this
-    /// clock.
-    pub const BOOTTIME_ALARM: Self = Self(sys::CLOCK_BOOTTIME_ALARM);
 }
 
 // ===== Flags =====
@@ -126,17 +104,11 @@ flags::impl_bitops_simple!(Flags);
 pub struct TimerFlags(i32);
 
 impl TimerFlags {
-    /// Interpret new_value.it_value as an absolute value on the timer's clock.
-    ///
-    /// The timer will expire when the value of the timer's clock reaches the value specified in
-    /// new_value.it_value.
+    /// Interpret `new_value.it_value` as an absolute value on the timer's clock.
     pub const ABSTIME: Self = Self(sys::TFD_TIMER_ABSTIME);
-    /// If this flag is specified along with [`TimerFlags::ABSTIME`] and the clock for this timer is
-    /// [`ClockKind::REALTIME`] or [`ClockKind::REALTIME_ALARM`], then mark this timer as cancelable
-    /// if the real-time clock undergoes a discontinuous change (`settimeofday(2)`,
-    /// `clock_settime(2)`, or similar).
+    /// Mark this timer as cancelable if the real-time clock undergoes a discontinuous change.
     ///
-    /// When such changes occur, a current or future `read(2)` will fail with the error ECANCELED.
+    /// When such changes occur, a current or future `read(2)` will fail with the error `ECANCELED`.
     pub const CANCEL_ON_SET: Self = Self(sys::TFD_TIMER_CANCEL_ON_SET);
 }
 
