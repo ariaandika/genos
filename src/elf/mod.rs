@@ -1,5 +1,5 @@
 //! Executable and Linkable Format (ELF).
-pub use helper::ElfFile;
+pub use helper::{ElfFile, GNUHashLookup};
 
 pub mod types;
 pub mod hash;

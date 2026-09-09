@@ -4,7 +4,7 @@
 use genos::elf::gnu::GNUHashTable;
 use genos::elf::hash::ELFHashTable;
 use genos::elf::types::{DynTag, Elf64_Dyn, Elf64_Sym, PType};
-use genos::elf::{ElfFile, gnu};
+use genos::elf::{ElfFile, GNUHashLookup};
 use genos::env::Stack;
 use genos::ffi::Char;
 use genos::process;
@@ -72,13 +72,12 @@ unsafe extern "C" fn init(stack: &Stack) -> ! {
 
     // ===== vdso =====
 
-    match elf {
-        Some(elf) => {
-            if let Err(err) = vdso(elf) {
-                println!("vdso inspection failed: {err}")
-            }
+    if let Some(elf) = elf {
+        if let Err(err) = vdso(elf) {
+            println!("vdso inspection failed: {err}")
         }
-        _ => println!("vdso is not available"),
+    } else {
+        println!("vdso is not available")
     }
 
     process::_exit(0)
@@ -126,13 +125,13 @@ unsafe fn vdso(elf: ElfFile) -> Result<(), &'static str> {
         let sym_hash = ELFHashTable::from_raw(sym_hash);
         let syms = core::slice::from_raw_parts(symtab, sym_hash.nchain() as usize);
         for sym in syms {
-            let entry_name = nth(strtab, sym.st_name);
-            println!("[SYMBOL]: {entry_name:?}");
+            let name = unsafe { &*(strtab as *const Char).add(sym.st_name as usize) };
+            println!("[SYMBOL]: {name:?}");
         }
     }
 
-    let search = VdsoSearch { symtab, strtab, hash_table };
-    let Some(sym) = search.search_symbol(TIME_VDSO_SYM) else {
+    let table = GNUHashLookup::new(symtab, strtab, hash_table);
+    let Some(sym) = table.symbol(TIME_VDSO_SYM) else {
         return Err("`getrandom` vdso not available");
     };
 
@@ -145,71 +144,6 @@ unsafe fn vdso(elf: ElfFile) -> Result<(), &'static str> {
     println!("[TIME]: {time}");
 
     Ok(())
-}
-
-struct VdsoSearch<'a> {
-    symtab: &'a Elf64_Sym,
-    strtab: &'a Char,
-    hash_table: &'a GNUHashTable,
-}
-
-impl<'a> VdsoSearch<'a> {
-    fn search_symbol(&self, name: &Char) -> Option<&Elf64_Sym> {
-        // hash table lookup
-        let hash = gnu::gnu_hash_cstr(name);
-        if !self.hash_table.bloom_filter(hash) {
-            // fast filter
-            return None;
-        }
-
-        // grab the bucket value, it contains index to symtab
-        let bucket_i = hash % self.hash_table.nbuckets();
-        let mut symtab_i = self.hash_table.buckets()[bucket_i as usize];
-
-        // iterate hash entry chains linearly
-        let chains = self.hash_table.chains();
-        loop {
-            let chain = nth(chains, symtab_i - self.hash_table.symoffset());
-
-            // compare the hash integer before strcmp for fast filter
-            if (*chain | 1) == (hash | 1) {
-                let sym = nth(self.symtab, symtab_i);
-                let entry_name = nth(self.strtab, sym.st_name);
-
-                if strcmp(entry_name, name) {
-                    return Some(sym);
-                }
-            }
-
-            // chain least significant bit indicate the end of the chain
-            if *chain & 1 != 0 {
-                return None;
-            }
-
-            symtab_i += 1;
-        }
-    }
-}
-
-// ===== helper functions =====
-
-fn nth<T>(elem: &T, n: u32) -> &T {
-    unsafe { &*(elem as *const T).add(n as usize) }
-}
-
-fn strcmp(s1: &Char, s2: &Char) -> bool {
-    unsafe {
-        let mut s1 = s1.as_ptr();
-        let mut s2 = s2.as_ptr();
-        while *s1 == *s2 {
-            if (*s1 & *s2) == 0 {
-                return *s1 == *s2;
-            }
-            s1 = s1.add(1);
-            s2 = s2.add(1);
-        }
-        false
-    }
 }
 
 // ===== extern =====

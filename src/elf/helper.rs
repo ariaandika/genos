@@ -1,7 +1,11 @@
 use core::slice;
 
-use crate::elf::types::{Elf64_Dyn, Elf64_Ehdr, Elf64_Phdr, PType};
+use crate::elf::gnu::{self, GNUHashTable};
+use crate::elf::types::{Elf64_Dyn, Elf64_Ehdr, Elf64_Phdr, Elf64_Sym, PType};
 use crate::env::{AuxType, Auxiliary};
+use crate::ffi::Char;
+
+// ===== ElfFile =====
 
 /// ELF File helper.
 ///
@@ -70,5 +74,90 @@ impl<'a> ElfFile<'a> {
             },
             _ => None,
         }
+    }
+}
+
+// ===== GNUHashLookup =====
+
+/// GNU Hash Table Lookup.
+#[derive(Debug)]
+pub struct GNUHashLookup<'a> {
+    symtab: &'a Elf64_Sym,
+    strtab: &'a Char,
+    hash_table: &'a GNUHashTable,
+}
+
+impl<'a> GNUHashLookup<'a> {
+    /// Creates new [`GNUHashLookup`].
+    ///
+    /// # Safety
+    ///
+    /// This method requires that the memory are properly placed adhere to the ELF format.
+    #[inline]
+    pub unsafe fn new(
+        symtab: &'a Elf64_Sym,
+        strtab: &'a Char,
+        hash_table: &'a GNUHashTable,
+    ) -> Self {
+        Self { symtab, strtab, hash_table }
+    }
+
+    /// Perform a symbol lookup by name.
+    #[inline]
+    pub fn symbol(&self, name: &Char) -> Option<&Elf64_Sym> {
+        // hash table lookup
+        let hash = gnu::gnu_hash_cstr(name);
+        if !self.hash_table.bloom_filter(hash) {
+            // fast filter
+            return None;
+        }
+
+        // grab the bucket value, it contains index to symtab
+        let bucket_i = hash % self.hash_table.nbuckets();
+        let mut symtab_i = unsafe { *self.hash_table.bucket_ptr().add(bucket_i as usize) };
+
+        // iterate hash entry chains linearly
+        let chains = self.hash_table.chains();
+        loop {
+            let chain = nth(chains, symtab_i - self.hash_table.symoffset());
+
+            // compare the hash integer before strcmp for fast filter
+            if (*chain | 1) == (hash | 1) {
+                let sym = nth(self.symtab, symtab_i);
+                let entry_name = nth(self.strtab, sym.st_name);
+
+                if strcmp(entry_name, name) {
+                    return Some(sym);
+                }
+            }
+
+            // chain least significant bit indicate the end of the chain
+            if *chain & 1 != 0 {
+                return None;
+            }
+
+            symtab_i += 1;
+        }
+    }
+}
+
+// ===== helper functions =====
+
+fn nth<T>(elem: &T, n: u32) -> &T {
+    unsafe { &*(elem as *const T).add(n as usize) }
+}
+
+fn strcmp(s1: &Char, s2: &Char) -> bool {
+    unsafe {
+        let mut s1 = s1.as_ptr();
+        let mut s2 = s2.as_ptr();
+        while *s1 == *s2 {
+            if (*s1 & *s2) == 0 {
+                return *s1 == *s2;
+            }
+            s1 = s1.add(1);
+            s2 = s2.add(1);
+        }
+        false
     }
 }

@@ -87,8 +87,12 @@ impl GNUHashTable {
 }
 
 impl GNUHashTable {
-    const fn blooms_ptr(&self) -> *const u64 {
+    pub(crate) const fn blooms_ptr(&self) -> *const u64 {
         unsafe { self.as_ptr().add(4).cast() }
+    }
+
+    pub(crate) const fn bucket_ptr(&self) -> *const u32 {
+        unsafe { self.as_ptr().add(4 + (self.bloom_size * 2) as usize) }
     }
 
     /// Returns the blooms as slice.
@@ -100,8 +104,7 @@ impl GNUHashTable {
     /// Returns the blooms as slice.
     #[inline]
     pub const fn buckets(&self) -> &[u32] {
-        let off = 4 + (self.bloom_size * 2) as usize;
-        unsafe { slice::from_raw_parts(self.as_ptr().add(off).cast(), self.nbuckets as usize) }
+        unsafe { slice::from_raw_parts(self.bucket_ptr(), self.nbuckets as usize) }
     }
 
     /// Returns reference to the chains first element.
