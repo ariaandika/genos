@@ -80,7 +80,7 @@ unsafe extern "C" fn init(stack: &Stack) -> ! {
         println!("vdso is not available")
     }
 
-    process::_exit(0)
+    process::exit(0)
 }
 
 unsafe fn vdso(elf: ElfFile) -> Result<(), &'static str> {
@@ -153,7 +153,7 @@ unsafe fn vdso(elf: ElfFile) -> Result<(), &'static str> {
 fn panic_me(info: &core::panic::PanicInfo) -> ! {
     let at = core::fmt::from_fn(|f| info.location().map_or(Ok(()), |l| write!(f, " at {l}")));
     println!("Thread panicked{at}: {}", info.message());
-    process::_exit(101)
+    process::exit(101)
 }
 
 #[unsafe(no_mangle)]

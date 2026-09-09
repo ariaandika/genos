@@ -8,14 +8,14 @@ use crate::{error, sys};
 
 /// Terminate process with given status code.
 #[inline]
-pub fn _exit(status: i32) -> ! {
-    sys::call!(NORETURN, __NR_exit, status)
+pub fn exit(status: i32) -> ! {
+    sys::call!(NORETURN, sys_exit, status)
 }
 
 /// Executes the program referred to by path.
 #[inline]
 pub fn execve(path: &CStr, argv: &Option<&Char>, envp: &Option<&Char>) -> ErrCode {
-    ErrCode::new(-sys::call!(RD, __NR_execve, path, argv, envp).into_inner() as _)
+    ErrCode::new(-sys::call!(RD, sys_execve, path, argv, envp).into_inner() as _)
 }
 
 /// Process handle.
@@ -26,7 +26,7 @@ impl Process {
     /// Create [`Process`] referencing caller process.
     #[inline]
     pub fn this() -> Self {
-        let pid = sys::call!(RD, __NR_getpid).into_inner();
+        let pid = sys::call!(RD, sys_getpid).into_inner();
         // SAFETY: have faith from the kernel
         Self(unsafe { NonZeroI32::new_unchecked(pid as _) })
     }
@@ -36,7 +36,7 @@ impl Process {
     /// Returns `None` if parent is in a different PID namespace.
     #[inline]
     pub fn parent() -> Option<Self> {
-        let ppid = sys::call!(RD, __NR_getppid).into_inner();
+        let ppid = sys::call!(RD, sys_getppid).into_inner();
         NonZeroI32::new(ppid as _).map(Self)
     }
 
@@ -45,7 +45,7 @@ impl Process {
     /// Returns `None` if this execution is in the child process.
     #[inline]
     pub fn fork() -> Result<Option<Process>, ForkError> {
-        sys::call!(RD, __NR_fork)
+        sys::call!(RD, sys_fork)
             .io2()
             .map(|pid| NonZeroI32::new(pid as _).map(Self))
     }
@@ -59,7 +59,7 @@ impl Process {
     /// Send a signal to process this struct refers to.
     #[inline]
     pub fn kill(&self, sig: Signo) -> Result<(), KillError> {
-        sys::call!(RD, __NR_kill, self.0.get(), i32::from(sig)).e2()
+        sys::call!(RD, sys_kill, self.0.get(), i32::from(sig)).e2()
     }
 }
 
