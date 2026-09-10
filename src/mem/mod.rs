@@ -1,8 +1,8 @@
 //! Memory management.
-pub use mmap::Mmap;
+pub use mmap::{Mmap, MmapError, MmapFlags, Protection, mmap, munmap};
 pub use brk::{brk, current_brk};
 pub use error::OutOfMemory;
 
-pub mod mmap;
+mod mmap;
 mod brk;
 mod error;
