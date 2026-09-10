@@ -10,6 +10,8 @@ use genos::ffi::Char;
 use genos::process;
 use genos::time::TIME_VDSO_SYM;
 
+mod clone;
+
 macro_rules! print {
     ($($tt:tt)*) => {{
         use core::fmt::Write;
@@ -23,6 +25,8 @@ macro_rules! println {
         let _ = core::writeln!(genos::io::Stdout, $($tt)*);
     }};
 }
+
+use println;
 
 // naked function because compiler generate function prologue that pushes old base pointer
 #[unsafe(naked)]
@@ -80,6 +84,7 @@ unsafe extern "C" fn init(stack: &Stack) -> ! {
         println!("vdso is not available")
     }
 
+    clone::clone3_example();
     process::exit(0)
 }
 
