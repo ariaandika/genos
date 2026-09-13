@@ -1,4 +1,4 @@
-//! I/O Abstraction.
+//! Input/Output operations.
 pub use iovec::{IoVec, IoVecMut};
 pub use flags::IOFlags;
 pub use read::{Read, ReadError, read};

@@ -1,4 +1,4 @@
-//! I/O event notification facility.
+//! Non-blocking operations.
 pub use epoll::Epoll;
 
 pub mod epoll;

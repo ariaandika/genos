@@ -1,4 +1,4 @@
-//! Environment variables.
+//! Argument and Environment variables.
 pub use args::Args;
 pub use env::{Env, EnvIter};
 pub use aux::{Auxiliary, AuxType, AuxvIter};
