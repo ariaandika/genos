@@ -8,77 +8,47 @@ use crate::{error, fd, flags, sys};
 
 // ===== Epoll =====
 
-/// I/O event notification facility.
-///
-/// See `epoll(7)`.
+/// I/O event notification facility (`epoll(7)`).
 #[derive(Debug)]
 pub struct Epoll(OwnedFd);
 
 fd::impl_fd_simple!(Epoll);
 
 impl Epoll {
-    /// Creates new [`Epoll`].
-    ///
-    /// Reference: `epoll_create1(2)`.
+    /// Creates new [`Epoll`] (`epoll_create1(2)`).
     #[inline]
     pub fn create(flags: Flags) -> Result<Self> {
         sys::call!(RD, epoll_create1, flags.0).fd(Kind::Create)
     }
 
-    /// Add an entry to the interest list.
+    /// Add an entry to the interest list (`epoll_ctl(2)`).
     ///
     /// [`InputFlags`] can be added by `OR`-ing with [`EventType`].
-    ///
-    /// Reference: `epoll_ctl(2)`.
     #[inline]
     pub fn add<Fd: AsFd>(&self, fd: &Fd, events: EventType, data: u64) -> Result<()> {
         self.epoll_ctl(sys::EPOLL_CTL_ADD, fd, &Event { events, data }, Kind::Add)
     }
 
-    /// Change the settings associated with fd in the interest list.
+    /// Change the settings associated with fd in the interest list (`epoll_ctl(2)`).
     ///
     /// [`InputFlags`] can be added by `OR`-ing with [`EventType`].
-    ///
-    /// Reference: `epoll_ctl(2)`.
     #[inline]
     pub fn modify<Fd: AsFd>(&self, fd: &Fd, events: EventType, data: u64) -> Result<()> {
         self.epoll_ctl(sys::EPOLL_CTL_MOD, fd, &Event { events, data }, Kind::Mod)
     }
 
-    /// Remove (deregister) the target fd from the interest list.
-    ///
-    /// Reference: `epoll_ctl(2)`.
+    /// Remove (deregister) the target fd from the interest list (`epoll_ctl(2)`).
     #[inline]
     pub fn delete<Fd: AsFd>(&self, fd: &Fd) -> Result<()> {
         self.epoll_ctl(sys::EPOLL_CTL_DEL, fd, 0 as _, Kind::Del)
     }
 
+    #[inline]
     fn epoll_ctl<Fd: AsFd>(&self, op: i32, fd: &Fd, ev: *const Event, er: Kind) -> Result<()> {
         sys::call!(RD, epoll_ctl, self.as_fd(), op, fd.as_fd(), ev).e(er)
     }
-}
 
-impl Epoll {
-    /// Waits for an I/O event and returns the number of events written to the given buffer.
-    ///
-    /// `buf` must not be empty.
-    ///
-    /// The `timeout` specifies the number of milliseconds that this call will block.
-    ///
-    /// This call will block until either a file descriptor deliver an event, the call is interupted
-    /// by a signal handler, or `timeout` expires.
-    ///
-    /// Specifying a `timeout` of -1 causes this call to block indefinitely, while specifying a
-    /// `timeout` equal to zero causes this call to return immediately, even if no events are
-    /// available.
-    ///
-    /// The returned [`Event::data`] contains the same data as was specified in the most recent
-    /// supplied data for the corresponding open fd.
-    ///
-    /// The returned [`Event::events`] is a bit mask of that indicates the events that have occurred
-    /// for the corresponding open file description.
-    ///
-    /// Reference: `epoll_wait(2)`.
+    /// Waits for events `epoll_wait(2)`.
     #[inline]
     pub fn wait(&self, buf: &mut [MaybeUninit<Event>], timeout: i32) -> Result<usize> {
         sys::call!(epoll_wait, self.as_fd(), buf.as_mut_ptr(), buf.len(), timeout).io(Kind::Wait)
@@ -87,9 +57,7 @@ impl Epoll {
 
 // ===== EpollEvent =====
 
-/// [`Epoll`] event.
-///
-/// Reference: `epoll_event(3type)`.
+/// [`Epoll`] event (`epoll_event(3type)`).
 #[derive(Debug, Default, Clone)]
 #[repr(C, packed)]
 pub struct Event {
@@ -102,9 +70,7 @@ pub struct Event {
 
 // ===== Flags =====
 
-/// Epoll creation flags.
-///
-/// Refernce: `epoll_create1(2)`.
+/// [`Epoll`] creation flags.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct Flags(i32);
@@ -124,9 +90,7 @@ impl flags::OpenFlag for Flags {
 
 // ===== EventType =====
 
-/// Epoll event types.
-///
-/// Reference: `epoll_ctl(2)`.
+/// [`Epoll`] event types (`epoll_ctl(2)`).
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct EventType(u32);
@@ -152,9 +116,6 @@ impl EventType {
     /// [`Event::events`].
     pub const HUP: Self = Self(sys::EPOLLHUP);
     /// Stream socket peer closed connection, or shut down writing half of connection.
-    ///
-    /// This flag is especially useful for writing simple code to detect peer shutdown when using
-    /// edge-triggered monitoring.
     pub const RDHUP: Self = Self(sys::EPOLLRDHUP);
 
     /// Returns `true` if events contains [`EventType::IN`].
@@ -178,9 +139,7 @@ impl EventType {
 
 // ===== InputFlags =====
 
-/// Epoll input flags.
-///
-/// Reference: `epoll_ctl(2)`.
+/// [`Epoll`] input flags (`epoll_ctl(2)`).
 #[derive(Debug, Clone, Copy)]
 #[repr(transparent)]
 pub struct InputFlags(u32);
@@ -199,7 +158,7 @@ impl InputFlags {
 
 // ===== errors =====
 
-/// Type alias for result of [`Epoll`] operations.
+/// The result of [`Epoll`] operations.
 pub type Result<T> = result::Result<T, Error>;
 
 /// An error that may occur during any [`Epoll`] operations.
@@ -228,7 +187,7 @@ impl fmt::Display for Error {
             Kind::Add => "add fd to epoll",
             Kind::Mod => "modify fd on the epoll",
             Kind::Del => "delete fd on the epoll",
-            Kind::Wait => "wait for notification on the epoll",
+            Kind::Wait => "wait for epoll event",
         };
         write!(f, "failed to {msg}: {code}")
     }
