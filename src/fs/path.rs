@@ -5,7 +5,8 @@ use core::ptr::NonNull;
 use core::{ffi, marker};
 
 use crate::error::SysResExt;
-use crate::fs::{Kind, Result};
+use crate::fs::Result;
+use crate::fs::error::Kind;
 use crate::sys;
 
 /// File path.
@@ -32,30 +33,30 @@ impl Path {
     /// Truncate file to a size of precisely length bytes.
     #[inline]
     pub fn truncate(&self, length: sys::off_t) -> Result<()> {
-        sys::call!(RD, __NR_truncate, self.as_ptr(), length).e(Kind::Rename)
+        sys::call_rd!(sys_truncate, self.as_ptr(), length).e(Kind::Rename)
     }
 
     /// Change the name or location of a file.
     #[inline]
     pub fn rename(&self, newpath: &ffi::CStr) -> Result<()> {
-        sys::call!(RD, __NR_rename, self.as_ptr(), newpath).e(Kind::Rename)
+        sys::call_rd!(sys_rename, self.as_ptr(), newpath).e(Kind::Rename)
     }
 
     /// Make a new name for a file.
     #[inline]
     pub fn link(&self, newpath: &ffi::CStr) -> Result<()> {
-        sys::call!(RD, __NR_link, self.as_ptr(), newpath).e(Kind::Link)
+        sys::call_rd!(sys_link, self.as_ptr(), newpath).e(Kind::Link)
     }
 
     /// Make a new name for a file.
     #[inline]
     pub fn symlink(&self, linkpath: &ffi::CStr) -> Result<()> {
-        sys::call!(RD, __NR_symlink, self.as_ptr(), linkpath).e(Kind::Link)
+        sys::call_rd!(sys_symlink, self.as_ptr(), linkpath).e(Kind::Link)
     }
 
     /// Delete a name from the filesystem.
     #[inline]
     pub fn unlink(&self) -> Result<()> {
-        sys::call!(RD, __NR_unlink, self.as_ptr()).e(Kind::Unlink)
+        sys::call_rd!(sys_unlink, self.as_ptr()).e(Kind::Unlink)
     }
 }

@@ -27,7 +27,7 @@ impl Timerfd {
     /// - [`Clock::BOOTTIME_ALARM`]
     #[inline]
     pub fn create(clock: Clock, flags: Flags) -> Result<Self> {
-        sys::call!(RD, sys_timerfd_create, i32::from(clock), flags.0).fd(Kind::Create)
+        sys::call_rd!(sys_timerfd_create, i32::from(clock), flags.0).fd(Kind::Create)
     }
 
     /// Arms (starts) or disarms (stops) the timer.
@@ -41,7 +41,7 @@ impl Timerfd {
     /// the flags argument.
     #[inline]
     pub fn set_time(&self, time: &ITimerspec, flags: TimerFlags) -> Result<()> {
-        sys::call!(RD, sys_timerfd_settime, self.as_fd(), flags.0, time, 0).e(Kind::Set)
+        sys::call_rd!(sys_timerfd_settime, self.as_fd(), flags.0, time, 0).e(Kind::Set)
     }
 
     /// Returns the current timer.

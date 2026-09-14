@@ -61,7 +61,7 @@ impl Clock {
     /// Set the time of this clock.
     #[inline]
     pub fn set_time(self, time: &Timespec) -> Result<()> {
-        sys::call!(RD, sys_clock_settime, self.0, time).e(Kind::Set)
+        sys::call_rd!(sys_clock_settime, self.0, time).e(Kind::Set)
     }
 }
 

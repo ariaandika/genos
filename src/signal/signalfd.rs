@@ -19,7 +19,7 @@ impl Signalfd {
     /// Create new [`Signalfd`].
     #[inline]
     pub fn new(sigset: &Sigset, flags: Flags) -> Result<Self> {
-        sys::call!(__NR_signalfd, -1, sigset.as_ref(), flags.0).fd(Kind::Create)
+        sys::call_rd!(sys_signalfd, -1, sigset.as_ref(), flags.0).fd(Kind::Create)
     }
 
     /// Read for pending signal.

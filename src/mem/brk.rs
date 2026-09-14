@@ -27,5 +27,5 @@ pub fn current_brk() -> NonNull<c_void> {
 }
 
 fn brk_inner(addr: *mut c_void) -> *mut c_void {
-    sys::call!(RD, sys_brk, addr).into_inner() as _
+    sys::call_rd!(sys_brk, addr).into_inner() as _
 }

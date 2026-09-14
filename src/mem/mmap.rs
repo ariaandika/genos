@@ -20,7 +20,7 @@ pub fn mmap(
     fd: BorrowedFd<'_>,
     offset: i64,
 ) -> Result<NonNull<u8>, MmapError> {
-    sys::call!(RD, sys_mmap, addr, size, prot.0, flags.0, fd, offset).p2()
+    sys::call_rd!(sys_mmap, addr, size, prot.0, flags.0, fd, offset).p2()
 }
 
 /// Unmap files or devices from memory.
@@ -28,7 +28,7 @@ pub fn mmap(
 /// Reference: `munmap(2)`.
 #[inline]
 pub fn munmap(addr: *mut c_void, size: usize) -> Result<(), MmapError> {
-    sys::call!(RD, sys_munmap, addr, size).e2()
+    sys::call_rd!(sys_munmap, addr, size).e2()
 }
 
 // ===== Mmap =====
@@ -123,7 +123,7 @@ flags::impl_bitops_simple!(MmapFlags);
 impl MmapFlags {
     /// Shared this mapping.
     pub const SHARED: Self = Self(sys::MAP_SHARED);
-    /// Same as [`Flags::SHARED`] and validate unknown flags.
+    /// Same as [`MmapFlags::SHARED`] and validate unknown flags.
     pub const SHARED_VALIDATE: Self = Self(sys::MAP_SHARED_VALIDATE);
     /// Create a private copy-on-write mapping.
     pub const PRIVATE: Self = Self(sys::MAP_PRIVATE);

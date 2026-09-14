@@ -17,7 +17,7 @@ pub trait Write: AsFd {
     /// or the call was interrupted by a signal handler after having written less than count bytes.
     #[inline]
     fn write(&self, buf: &[u8]) -> Result<usize, Self::Error> {
-        sys::call!(RD, sys_write, self.as_fd(), buf, buf.len())
+        sys::call_rd!(sys_write, self.as_fd(), buf, buf.len())
             .io2::<WriteError>()
             .map_err(<_>::into)
     }
@@ -25,7 +25,7 @@ pub trait Write: AsFd {
     /// Writes bytes from the buffer to this fd at given offset.
     #[inline]
     fn pwrite(&self, buf: &[u8], offset: Offset) -> Result<usize, Self::Error> {
-        sys::call!(RD, sys_pwrite64, self.as_fd(), buf, buf.len(), offset)
+        sys::call_rd!(sys_pwrite64, self.as_fd(), buf, buf.len(), offset)
             .io2::<WriteError>()
             .map_err(<_>::into)
     }
@@ -33,7 +33,7 @@ pub trait Write: AsFd {
     /// Writes bytes from gathered buffer to this fd.
     #[inline]
     fn writev(&self, buf: &[IoVec<'_>]) -> Result<usize, Self::Error> {
-        sys::call!(RD, sys_writev, self.as_fd(), buf, buf.len())
+        sys::call_rd!(sys_writev, self.as_fd(), buf, buf.len())
             .io2::<WriteError>()
             .map_err(<_>::into)
     }
@@ -46,7 +46,7 @@ pub trait Write: AsFd {
         offset: Offset,
         flags: IOFlags,
     ) -> Result<usize, Self::Error> {
-        sys::call!(RD, sys_pwritev, self.as_fd(), buf, buf.len(), offset, i32::from(flags))
+        sys::call_rd!(sys_pwritev, self.as_fd(), buf, buf.len(), offset, i32::from(flags))
             .io2::<WriteError>()
             .map_err(<_>::into)
     }

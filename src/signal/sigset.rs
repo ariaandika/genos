@@ -1,3 +1,6 @@
+//! [`Sigset`] associated types.
+use core::result;
+
 use crate::error::{ErrCode, SysResExt};
 use crate::signal::Signo;
 use crate::{error, sys};
@@ -46,24 +49,32 @@ impl Sigset {
 
     /// Set the blocked signals to the union of the current set and this set.
     #[inline]
-    pub fn block(&self) -> Result<(), ProcSignalError> {
-        sys::call!(RD, __NR_rt_sigprocmask, sys::SIG_BLOCK, self, 0).e2()
+    pub fn block(&self) -> Result<()> {
+        self.rt_sigprocmask(sys::SIG_BLOCK)
     }
 
     /// Remove the blocked signals that is in this set.
     #[inline]
-    pub fn unblock(&self) -> Result<(), ProcSignalError> {
-        sys::call!(RD, __NR_rt_sigprocmask, sys::SIG_UNBLOCK, self, 0).e2()
+    pub fn unblock(&self) -> Result<()> {
+        self.rt_sigprocmask(sys::SIG_UNBLOCK)
     }
 
     /// Set the blocked signals to this set.
     #[inline]
-    pub fn setmask(&self) -> Result<(), ProcSignalError> {
-        sys::call!(RD, __NR_rt_sigprocmask, sys::SIG_SETMASK, self, 0).e2()
+    pub fn setmask(&self) -> Result<()> {
+        self.rt_sigprocmask(sys::SIG_SETMASK)
+    }
+
+    #[inline]
+    fn rt_sigprocmask(&self, how: i32) -> Result<()> {
+        sys::call_rd!(sys_rt_sigprocmask, how, self, 0).e2()
     }
 }
 
 // ===== Error =====
+
+/// The result of changing blocked signals.
+pub type Result<T, E = ProcSignalError> = result::Result<T, E>;
 
 /// An error that may occur when changing blocked signals.
 #[derive(Clone, Copy)]

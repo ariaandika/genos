@@ -21,7 +21,7 @@ impl Socket {
     /// Creates new [`Socket`].
     #[inline]
     pub fn create(domain: Family, ty: Type, flags: Flags) -> Result<Self> {
-        sys::call!(RD, __NR_socket, i32::from(domain), ty.0 | flags.0, 0).fd(Kind::Create)
+        sys::call_rd!(sys_socket, i32::from(domain), ty.0 | flags.0, 0).fd(Kind::Create)
     }
 
     /// Creates new UNIX domain [`Socket`] stream.
@@ -36,21 +36,21 @@ impl Socket {
     #[inline]
     pub fn bind<A: SockAddr>(&self, addr: &A) -> Result<()> {
         let len = size_of::<A>() as sys::socklen_t;
-        sys::call!(RD, __NR_bind, self.as_fd(), addr, len).e(Kind::Bind)
+        sys::call_rd!(sys_bind, self.as_fd(), addr, len).e(Kind::Bind)
     }
 
     /// Initiate a connection on this socket.
     #[inline]
     pub fn connect<A: SockAddr>(&self, addr: &A) -> Result<()> {
         let len = size_of::<A>() as sys::socklen_t;
-        sys::call!(RD, __NR_connect, self.as_fd(), addr, len).e(Kind::Connect)
+        sys::call_rd!(sys_connect, self.as_fd(), addr, len).e(Kind::Connect)
     }
 
     /// Returns this socket address.
     #[inline]
     pub fn addr<A: SockAddr>(&self) -> Result<A> {
         let (mut addr, mut len) = (A::zeroed(), A::socklen_t());
-        sys::call!(__NR_getsockname, self.as_fd(), &mut addr, &mut len).e(Kind::GetAddr)?;
+        sys::call!(sys_getsockname, self.as_fd(), &mut addr, &mut len).e(Kind::GetAddr)?;
         Self::validate_addr(addr, len)
     }
 
@@ -58,7 +58,7 @@ impl Socket {
     #[inline]
     pub fn peer_addr<A: SockAddr>(&self) -> Result<A> {
         let (mut addr, mut len) = (A::zeroed(), A::socklen_t());
-        sys::call!(__NR_getpeername, self.as_fd(), &mut addr, &mut len).e(Kind::GetAddr)?;
+        sys::call!(sys_getpeername, self.as_fd(), &mut addr, &mut len).e(Kind::GetAddr)?;
         Self::validate_addr(addr, len)
     }
 
@@ -76,13 +76,13 @@ impl Socket {
     /// Listen for connections on this socket.
     #[inline]
     pub fn listen(&self) -> Result<()> {
-        sys::call!(RD, __NR_listen, self.as_fd(), -1).e(Kind::Listen)
+        sys::call_rd!(sys_listen, self.as_fd(), -1).e(Kind::Listen)
     }
 
     /// Shut down part of a full-duplex connection.
     #[inline]
     pub fn shutdown(&self) -> Result<()> {
-        sys::call!(RD, __NR_shutdown, self.as_fd(), -1).e(Kind::Shutdown)
+        sys::call_rd!(sys_shutdown, self.as_fd(), -1).e(Kind::Shutdown)
     }
 }
 
@@ -99,31 +99,31 @@ impl Socket {
     /// Send message on this fd.
     #[inline]
     pub fn send(&self, buf: &[u8], flags: SendFlags) -> Result<usize> {
-        sys::call!(RD, __NR_sendto, self.as_fd(), buf, buf.len(), flags.0, 0, 0).io(Kind::Write)
+        sys::call_rd!(sys_sendto, self.as_fd(), buf, buf.len(), flags.0, 0, 0).io(Kind::Write)
     }
 
     /// Send message on this fd.
     #[inline]
     pub fn sendmsg(&self, msg: &MsgHdr, flags: SendFlags) -> Result<usize> {
-        sys::call!(RD, __NR_sendmsg, self.as_fd(), msg, flags.0).io(Kind::Write)
+        sys::call_rd!(sys_sendmsg, self.as_fd(), msg, flags.0).io(Kind::Write)
     }
 
     /// Receive message from this fd.
     #[inline]
     pub fn recv(&self, buf: &mut [MaybeUninit<u8>], flags: RecvFlags) -> Result<usize> {
-        sys::call!(__NR_recvfrom, self.as_fd(), &mut *buf, buf.len(), flags.0, 0, 0).io(Kind::Read)
+        sys::call!(sys_recvfrom, self.as_fd(), &mut *buf, buf.len(), flags.0, 0, 0).io(Kind::Read)
     }
 
     /// Receive message from this fd.
     #[inline]
     pub fn recvmsg(&self, msg: &mut MsgHdrMut, flags: RecvFlags) -> Result<usize> {
-        sys::call!(__NR_recvmsg, self.as_fd(), msg, flags.0).io(Kind::Read)
+        sys::call!(sys_recvmsg, self.as_fd(), msg, flags.0).io(Kind::Read)
     }
 
     /// Accept a connection on this socket.
     #[inline]
     pub fn accept(&self, flags: Flags) -> Result<Self> {
-        sys::call!(RD, __NR_accept4, self.as_fd(), 0, 0, flags.0).fd(Kind::Accept)
+        sys::call_rd!(sys_accept4, self.as_fd(), 0, 0, flags.0).fd(Kind::Accept)
     }
 }
 

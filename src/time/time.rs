@@ -8,5 +8,5 @@ pub const TIME_VDSO_SYM: &Char = Char::new(c"__vdso_time");
 #[inline]
 pub fn time() -> u64 {
     // Y2038: lmao
-    sys::call!(RD, sys_time, 0).into_inner() as _
+    sys::call_rd!(sys_time, 0).into_inner() as _
 }

@@ -18,7 +18,7 @@ impl Epoll {
     /// Creates new [`Epoll`] (`epoll_create1(2)`).
     #[inline]
     pub fn create(flags: Flags) -> Result<Self> {
-        sys::call!(RD, epoll_create1, flags.0).fd(Kind::Create)
+        sys::call_rd!(sys_epoll_create1, flags.0).fd(Kind::Create)
     }
 
     /// Add an entry to the interest list (`epoll_ctl(2)`).
@@ -45,13 +45,14 @@ impl Epoll {
 
     #[inline]
     fn epoll_ctl<Fd: AsFd>(&self, op: i32, fd: &Fd, ev: *const Event, er: Kind) -> Result<()> {
-        sys::call!(RD, epoll_ctl, self.as_fd(), op, fd.as_fd(), ev).e(er)
+        sys::call_rd!(sys_epoll_ctl, self.as_fd(), op, fd.as_fd(), ev).e(er)
     }
 
     /// Waits for events `epoll_wait(2)`.
     #[inline]
     pub fn wait(&self, buf: &mut [MaybeUninit<Event>], timeout: i32) -> Result<usize> {
-        sys::call!(epoll_wait, self.as_fd(), buf.as_mut_ptr(), buf.len(), timeout).io(Kind::Wait)
+        sys::call!(sys_epoll_wait, self.as_fd(), buf.as_mut_ptr(), buf.len(), timeout)
+            .io(Kind::Wait)
     }
 }
 

@@ -1,10 +1,9 @@
 //! [`File`] associated types.
-
-use core::ffi::CStr;
-
 use crate::error::SysResExt;
 use crate::fd::{AsFd, OwnedFd};
-use crate::fs::{Error, Kind, Result};
+use crate::ffi::Char;
+use crate::fs::error::Kind;
+use crate::fs::{Error, Result};
 use crate::io::{Offset, Read, Write};
 use crate::{fd, flags, sys};
 
@@ -15,40 +14,33 @@ pub struct File(OwnedFd);
 fd::impl_fd_simple!(File);
 
 impl File {
-    /// Opens specified file.
+    /// Opens specified file (`open(2)`).
     ///
-    /// [`AccessMode`] can be ORed with [`OpenFlags`].
-    ///
-    /// Reference: `open(2)`.
+    /// [`AccessMode`] can be OR-ed with [`OpenFlags`].
     #[inline]
-    pub fn open(path: &CStr, mode: AccessMode) -> Result<Self> {
-        sys::call!(RD, sys_open, path, mode.0).fd(Kind::Open)
+    pub fn open(path: &Char, mode: AccessMode) -> Result<Self> {
+        sys::call_rd!(sys_open, path, mode.0).fd(Kind::Open)
     }
 
-    /// Create file if does not exists, open in write-only mode, and truncate to length 0.
-    ///
-    /// Reference: `creat(2)`.
+    /// Create file if does not exists, open in write-only mode, and truncate to length 0
+    /// (`creat(2)`).
     #[inline]
-    pub fn create(path: &CStr, mode: sys::mode_t) -> Result<Self> {
-        sys::call!(RD, sys_creat, path, mode).fd(Kind::Create)
+    pub fn create(path: &Char, mode: sys::mode_t) -> Result<Self> {
+        sys::call_rd!(sys_creat, path, mode).fd(Kind::Create)
     }
 
-    /// Reposition read/write offset.
-    ///
-    /// Reference: `lseek(2)`.
+    /// Reposition read/write offset (`lseek(2)`).
     #[inline]
     pub fn seek(&self, offset: Offset, seek: Seek) -> Result<Offset> {
-        sys::call!(RD, sys_lseek, self.as_fd(), offset, seek.0)
+        sys::call_rd!(sys_lseek, self.as_fd(), offset, seek.0)
             .io(Kind::Seek)
             .map(|e| e as _)
     }
 
-    /// Truncate file to a size of precisely length bytes.
-    ///
-    /// Reference: `ftruncate(2)`.
+    /// Truncate file to a size of precisely length bytes (`ftruncate(2)`).
     #[inline]
     pub fn truncate(&self, length: Offset) -> Result<()> {
-        sys::call!(RD, sys_ftruncate, self.as_fd(), length).e(Kind::Truncate)
+        sys::call_rd!(sys_ftruncate, self.as_fd(), length).e(Kind::Truncate)
     }
 }
 
