@@ -17,12 +17,3 @@ mod stream;
 mod read;
 mod write;
 mod splice;
-
-/// Write to standard output with a newline.
-#[macro_export]
-macro_rules! println {
-    ($($tt:tt)*) => {{
-        use core::fmt::Write;
-        let _ = core::writeln!(genos::io::Stdout, $($tt)*);
-    }};
-}

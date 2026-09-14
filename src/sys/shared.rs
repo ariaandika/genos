@@ -7,13 +7,6 @@ use crate::sys;
 
 pub const SCM_MAX_FD: i32 = 253;
 
-// source: include/linux/splice.h
-
-pub const SPLICE_F_MOVE: u32 = 0x01;
-pub const SPLICE_F_NONBLOCK: u32 = 0x02;
-pub const SPLICE_F_MORE: u32 = 0x04;
-pub const SPLICE_F_GIFT: u32 = 0x08;
-
 // source: include/linux/net.h
 
 pub const SOCK_STREAM: i32 = 1;
@@ -100,17 +93,6 @@ pub type off_t = sys::__kernel_off_t;
 
 /// source: `sockaddr(3type)`
 pub type socklen_t = u32;
-
-// source: include/uapi/linux/fs.h
-
-pub const RWF_HIPRI: i32 = 0x00000001;
-pub const RWF_DSYNC: i32 = 0x00000002;
-pub const RWF_SYNC: i32 = 0x00000004;
-pub const RWF_NOWAIT: i32 = 0x00000008;
-pub const RWF_APPEND: i32 = 0x00000010;
-pub const RWF_NOAPPEND: i32 = 0x00000020;
-pub const RWF_ATOMIC: i32 = 0x00000040;
-pub const RWF_DONTCACHE: i32 = 0x00000080;
 
 // source: include/uapi/linux/mman.h
 

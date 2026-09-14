@@ -57,15 +57,17 @@ pub struct SpliceFlags(u32);
 
 flags::impl_bitops_simple!(SpliceFlags);
 
+// include/linux/splice.h
+
 impl SpliceFlags {
     /// `SPLICE_F_MOVE`
-    pub const MOVE: Self = Self(sys::SPLICE_F_MOVE);
+    pub const MOVE: Self = Self(0x01);
     /// `SPLICE_F_NONBLOCK`
-    pub const NONBLOCK: Self = Self(sys::SPLICE_F_NONBLOCK);
+    pub const NONBLOCK: Self = Self(0x02);
     /// `SPLICE_F_MORE`
-    pub const MORE: Self = Self(sys::SPLICE_F_MORE);
+    pub const MORE: Self = Self(0x04);
     /// `SPLICE_F_GIFT`
-    pub const GIFT: Self = Self(sys::SPLICE_F_GIFT);
+    pub const GIFT: Self = Self(0x08);
 }
 
 // ===== error =====
