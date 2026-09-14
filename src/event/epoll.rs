@@ -26,7 +26,7 @@ impl Epoll {
     /// [`InputFlags`] can be added by `OR`-ing with [`EventType`].
     #[inline]
     pub fn add<Fd: AsFd>(&self, fd: &Fd, events: EventType, data: u64) -> Result<()> {
-        self.epoll_ctl(sys::EPOLL_CTL_ADD, fd, &Event { events, data }, Kind::Add)
+        self.epoll_ctl(EPOLL_CTL_ADD, fd, &Event { events, data }, Kind::Add)
     }
 
     /// Change the settings associated with fd in the interest list (`epoll_ctl(2)`).
@@ -34,13 +34,13 @@ impl Epoll {
     /// [`InputFlags`] can be added by `OR`-ing with [`EventType`].
     #[inline]
     pub fn modify<Fd: AsFd>(&self, fd: &Fd, events: EventType, data: u64) -> Result<()> {
-        self.epoll_ctl(sys::EPOLL_CTL_MOD, fd, &Event { events, data }, Kind::Mod)
+        self.epoll_ctl(EPOLL_CTL_MOD, fd, &Event { events, data }, Kind::Mod)
     }
 
     /// Remove (deregister) the target fd from the interest list (`epoll_ctl(2)`).
     #[inline]
     pub fn delete<Fd: AsFd>(&self, fd: &Fd) -> Result<()> {
-        self.epoll_ctl(sys::EPOLL_CTL_DEL, fd, 0 as _, Kind::Del)
+        self.epoll_ctl(EPOLL_CTL_DEL, fd, 0 as _, Kind::Del)
     }
 
     #[inline]
@@ -56,7 +56,7 @@ impl Epoll {
     }
 }
 
-// ===== EpollEvent =====
+// ===== Event =====
 
 /// [`Epoll`] event (`epoll_event(3type)`).
 #[derive(Debug, Default, Clone)]
@@ -71,27 +71,21 @@ pub struct Event {
 
 // ===== Flags =====
 
-/// [`Epoll`] creation flags.
+/// [`Epoll::create`] flags.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct Flags(i32);
 
 flags::impl_bitops_simple!(Flags);
 
-impl Flags {
-    /// Set the close-on-exec (FD_CLOEXEC) flag on the new fd.
-    pub const CLOEXEC: Self = Self(sys::EPOLL_CLOEXEC);
-}
-
-impl flags::OpenFlag for Flags {
-    const CLOEXEC: Self = Self::CLOEXEC;
-    /// Epoll does not have non-blocking mode.
-    const NONBLOCK: Self = Self(0);
+impl Epoll {
+    /// `EPOLL_CLOEXEC`
+    pub const CLOEXEC: Flags = Flags(EPOLL_CLOEXEC);
 }
 
 // ===== EventType =====
 
-/// [`Epoll`] event types (`epoll_ctl(2)`).
+/// [`Event`] types (`epoll_ctl(2)`).
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct EventType(u32);
@@ -99,65 +93,60 @@ pub struct EventType(u32);
 flags::impl_bitops_simple!(EventType);
 flags::impl_bitops_simple!(EventType, InputFlags);
 
+impl Epoll {
+    /// `EPOLLIN`
+    pub const IN: EventType = EventType(EPOLLIN);
+    /// `EPOLLPRI`
+    pub const PRI: EventType = EventType(EPOLLPRI);
+    /// `EPOLLOUT`
+    pub const OUT: EventType = EventType(EPOLLOUT);
+    /// `EPOLLERR`
+    pub const ERR: EventType = EventType(EPOLLERR);
+    /// `EPOLLHUP`
+    pub const HUP: EventType = EventType(EPOLLHUP);
+    /// `EPOLLRDHUP`
+    pub const RDHUP: EventType = EventType(EPOLLRDHUP);
+}
+
 impl EventType {
-    /// The associated file is available for `read` operations.
-    pub const IN: Self = Self(sys::EPOLLIN);
-    /// There is an exceptional condition on the file descriptor.
-    pub const PRI: Self = Self(sys::EPOLLPRI);
-    /// The associated file is available for `write` operations.
-    pub const OUT: Self = Self(sys::EPOLLOUT);
-    /// Error condition happened on the associated file descriptor.
-    ///
-    /// [`Epoll::wait`] will always report for this event; it is not necessary to set it in
-    /// [`Event::events`].
-    pub const ERR: Self = Self(sys::EPOLLERR);
-    /// Hang up happened on the associated file descriptor.
-    ///
-    /// [`Epoll::wait`] will always report for this event; it is not necessary to set it in
-    /// [`Event::events`].
-    pub const HUP: Self = Self(sys::EPOLLHUP);
-    /// Stream socket peer closed connection, or shut down writing half of connection.
-    pub const RDHUP: Self = Self(sys::EPOLLRDHUP);
-
-    /// Returns `true` if events contains [`EventType::IN`].
+    /// Returns `true` if events contains `EPOLLIN`.
     #[inline]
-    pub fn has_read(self) -> bool {
-        self & Self::IN == Self::IN
+    pub const fn has_read(self) -> bool {
+        self.0 & Epoll::IN.0 != 0
     }
 
-    /// Returns `true` if events contains [`EventType::OUT`].
+    /// Returns `true` if events contains `EPOLLOUT`.
     #[inline]
-    pub fn has_write(self) -> bool {
-        self & Self::OUT == Self::OUT
+    pub const fn has_write(self) -> bool {
+        self.0 & Epoll::OUT.0 != 0
     }
 
-    /// Returns `true` if events contains [`EventType::RDHUP`].
+    /// Returns `true` if events contains `EPOLLRDHUP`.
     #[inline]
-    pub fn has_read_hang_up(self) -> bool {
-        self & Self::RDHUP == Self::RDHUP
+    pub const fn has_rdhup(self) -> bool {
+        self.0 & Epoll::RDHUP.0 != 0
     }
 }
 
 // ===== InputFlags =====
 
-/// [`Epoll`] input flags (`epoll_ctl(2)`).
+/// [`Event`] input flags (`epoll_ctl(2)`).
 #[derive(Debug, Clone, Copy)]
 #[repr(transparent)]
 pub struct InputFlags(u32);
 
-impl InputFlags {
-    /// Requests edge-triggered notification for the associated file descriptor.
-    pub const ET: Self = Self(sys::EPOLLET);
-    /// Requests one-shot notification for the associated file descriptor.
-    pub const ONESHOT: Self = Self(sys::EPOLLONESHOT);
-    /// Ensure that the system does not enter "suspend" or "hibernate" while this event is pending
-    /// or being processed.
-    pub const WAKEUP: Self = Self(sys::EPOLLWAKEUP);
-    /// Sets an exclusive wakeup mode for the epoll fd that is being attached to the target fd.
-    pub const EXCLUSIVE: Self = Self(sys::EPOLLEXCLUSIVE);
+impl Epoll {
+    /// `EPOLLET`
+    pub const ET: InputFlags = InputFlags(EPOLLET);
+    /// `EPOLLONESHOT`
+    pub const ONESHOT: InputFlags = InputFlags(EPOLLONESHOT);
+    /// `EPOLLWAKEUP`
+    pub const WAKEUP: InputFlags = InputFlags(EPOLLWAKEUP);
+    /// `EPOLLEXCLUSIVE`
+    pub const EXCLUSIVE: InputFlags = InputFlags(EPOLLEXCLUSIVE);
 }
 
-// ===== errors =====
+// ===== Error =====
 
 /// The result of [`Epoll`] operations.
 pub type Result<T> = result::Result<T, Error>;
@@ -193,3 +182,24 @@ impl fmt::Display for Error {
         write!(f, "failed to {msg}: {code}")
     }
 }
+
+// ===== extern =====
+
+// include/uapi/linux/eventpoll.h
+
+const EPOLL_CLOEXEC: i32 = sys::O_CLOEXEC;
+
+const EPOLL_CTL_ADD: i32 = 1;
+const EPOLL_CTL_DEL: i32 = 2;
+const EPOLL_CTL_MOD: i32 = 3;
+
+const EPOLLIN: u32 = 0x00000001;
+const EPOLLPRI: u32 = 0x00000002;
+const EPOLLOUT: u32 = 0x00000004;
+const EPOLLERR: u32 = 0x00000008;
+const EPOLLHUP: u32 = 0x00000010;
+const EPOLLRDHUP: u32 = 0x00002000;
+const EPOLLEXCLUSIVE: u32 = 1 << 28;
+const EPOLLWAKEUP: u32 = 1 << 29;
+const EPOLLONESHOT: u32 = 1 << 30;
+const EPOLLET: u32 = 1 << 31;

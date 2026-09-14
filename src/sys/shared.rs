@@ -101,23 +101,6 @@ pub type off_t = sys::__kernel_off_t;
 /// source: `sockaddr(3type)`
 pub type socklen_t = u32;
 
-// source: include/uapi/linux/eventpoll.h
-
-pub const EPOLL_CLOEXEC: i32 = sys::O_CLOEXEC;
-pub const EPOLL_CTL_ADD: i32 = 1;
-pub const EPOLL_CTL_DEL: i32 = 2;
-pub const EPOLL_CTL_MOD: i32 = 3;
-pub const EPOLLIN: u32 = 0x00000001;
-pub const EPOLLPRI: u32 = 0x00000002;
-pub const EPOLLOUT: u32 = 0x00000004;
-pub const EPOLLERR: u32 = 0x00000008;
-pub const EPOLLHUP: u32 = 0x00000010;
-pub const EPOLLRDHUP: u32 = 0x00002000;
-pub const EPOLLEXCLUSIVE: u32 = 1 << 28;
-pub const EPOLLWAKEUP: u32 = 1 << 29;
-pub const EPOLLONESHOT: u32 = 1 << 30;
-pub const EPOLLET: u32 = 1 << 31;
-
 // source: include/uapi/linux/fs.h
 
 pub const SEEK_SET: i32 = 0;
