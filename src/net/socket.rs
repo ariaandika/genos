@@ -4,7 +4,6 @@ use core::{fmt, result};
 
 use crate::error::{ErrCode, SysResExt};
 use crate::fd::{AsFd, OwnedFd};
-use crate::io::{Read, ReadError, Write, WriteError};
 use crate::net::addr::{AddrError, Family, SockAddr};
 use crate::net::msg::{MsgHdr, MsgHdrMut};
 use crate::{error, fd, flags, sys};
@@ -86,15 +85,6 @@ impl Socket {
     }
 }
 
-impl Read for Socket {
-    type Error = Error;
-}
-
-impl Write for Socket {
-    type Error = Error;
-}
-
-// would block
 impl Socket {
     /// Send message on this fd.
     #[inline]
@@ -247,20 +237,6 @@ impl From<AddrError> for Error {
     #[inline]
     fn from(v: AddrError) -> Self {
         Self { kind: Kind::Addr(v), code: ErrCode::EINVAL }
-    }
-}
-
-impl From<ReadError> for Error {
-    #[inline]
-    fn from(v: ReadError) -> Self {
-        Self { kind: Kind::Read, code: v.into() }
-    }
-}
-
-impl From<WriteError> for Error {
-    #[inline]
-    fn from(v: WriteError) -> Self {
-        Self { kind: Kind::Write, code: v.into() }
     }
 }
 

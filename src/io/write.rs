@@ -1,55 +1,36 @@
 use crate::error::{ErrCode, SysResExt};
 use crate::fd::AsFd;
-use crate::io::{IOFlags, IoVec, Offset};
+use crate::io::{IoVec, Offset, RWFlags};
 use crate::{error, sys};
 
-/// A writable file descriptor.
-pub trait Write: AsFd {
-    /// An error that may occur when writing to this file descriptor.
-    type Error: error::Error + From<WriteError>;
+/// Writes bytes from the buffer to this fd (`write(2)`).
+#[inline]
+pub fn write<Fd: AsFd + ?Sized>(fd: &Fd, buf: &[u8]) -> Result<usize, WriteError> {
+    sys::call!(sys_write, fd.as_fd(), buf.as_ptr(), buf.len()).io2::<WriteError>()
+}
 
-    /// Writes bytes from the buffer to this fd.
-    ///
-    /// On success, the number of bytes written is returned.
-    ///
-    /// The number of bytes written may be less than count if, for example, there is insufficient
-    /// space on the underlying physical medium, or the RLIMIT_FSIZE resource limit is encountered,
-    /// or the call was interrupted by a signal handler after having written less than count bytes.
-    #[inline]
-    fn write(&self, buf: &[u8]) -> Result<usize, Self::Error> {
-        sys::call_rd!(sys_write, self.as_fd(), buf, buf.len())
-            .io2::<WriteError>()
-            .map_err(<_>::into)
-    }
+/// Writes bytes from the buffer to this fd at given offset (`pwrite(2)`).
+#[inline]
+pub fn pwrite<Fd: AsFd + ?Sized>(fd: &Fd, buf: &[u8], offset: Offset) -> Result<usize, WriteError> {
+    sys::call_rd!(sys_pwrite64, fd.as_fd(), buf, buf.len(), offset).io2::<WriteError>()
+}
 
-    /// Writes bytes from the buffer to this fd at given offset.
-    #[inline]
-    fn pwrite(&self, buf: &[u8], offset: Offset) -> Result<usize, Self::Error> {
-        sys::call_rd!(sys_pwrite64, self.as_fd(), buf, buf.len(), offset)
-            .io2::<WriteError>()
-            .map_err(<_>::into)
-    }
+/// Writes bytes from gathered buffer to this fd (`writev(2)`).
+#[inline]
+pub fn writev<Fd: AsFd + ?Sized>(fd: &Fd, buf: &[IoVec<'_>]) -> Result<usize, WriteError> {
+    sys::call_rd!(sys_writev, fd.as_fd(), buf, buf.len()).io2::<WriteError>()
+}
 
-    /// Writes bytes from gathered buffer to this fd.
-    #[inline]
-    fn writev(&self, buf: &[IoVec<'_>]) -> Result<usize, Self::Error> {
-        sys::call_rd!(sys_writev, self.as_fd(), buf, buf.len())
-            .io2::<WriteError>()
-            .map_err(<_>::into)
-    }
-
-    /// Writes bytes from gathered buffer to this fd at given offset.
-    #[inline]
-    fn pwritev(
-        &self,
-        buf: &[IoVec<'_>],
-        offset: Offset,
-        flags: IOFlags,
-    ) -> Result<usize, Self::Error> {
-        sys::call_rd!(sys_pwritev, self.as_fd(), buf, buf.len(), offset, i32::from(flags))
-            .io2::<WriteError>()
-            .map_err(<_>::into)
-    }
+/// Writes bytes from gathered buffer to this fd at given offset (`pwritev(2)`).
+#[inline]
+pub fn pwritev<Fd: AsFd + ?Sized>(
+    fd: &Fd,
+    buf: &[IoVec<'_>],
+    offset: Offset,
+    flags: RWFlags,
+) -> Result<usize, WriteError> {
+    sys::call_rd!(sys_pwritev2, fd.as_fd(), buf, buf.len(), offset, i32::from(flags))
+        .io2::<WriteError>()
 }
 
 // ===== Error =====

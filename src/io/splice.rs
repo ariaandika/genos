@@ -1,14 +1,11 @@
-//! Fd splicing.
 use crate::error::{ErrCode, SysResExt};
 use crate::fd::AsFd;
 use crate::io::{IoVecMut, Offset};
 use crate::{error, flags, sys};
 
-/// Copies data between one file descriptor and another.
-///
-/// Reference: `sendfile(2)`.
+/// Copies data between one file descriptor and another (`sendfile(2)`).
 #[inline]
-pub fn sendfile<O: AsFd, I: AsFd>(
+pub fn sendfile<O: AsFd + ?Sized, I: AsFd + ?Sized>(
     out_fd: &O,
     in_fd: &I,
     offset: Option<&mut Offset>,
@@ -17,11 +14,9 @@ pub fn sendfile<O: AsFd, I: AsFd>(
     sys::call!(sys_sendfile, out_fd.as_fd(), in_fd.as_fd(), offset, count).io2()
 }
 
-/// Splice data to/from a pipe.
-///
-/// Reference: `splice(2)`.
+/// Splice data to/from a pipe (`splice(2)`).
 #[inline]
-pub fn splice<I: AsFd, O: AsFd>(
+pub fn splice<I: AsFd + ?Sized, O: AsFd + ?Sized>(
     fd_in: &I,
     off_in: Option<&mut Offset>,
     fd_out: &O,
@@ -32,11 +27,9 @@ pub fn splice<I: AsFd, O: AsFd>(
     sys::call!(sys_splice, fd_in.as_fd(), off_in, fd_out.as_fd(), off_out, size, flags.0).io2()
 }
 
-/// Duplicate pipe content.
-///
-/// Reference: `tee(2)`.
+/// Duplicate pipe content (`tee(2)`).
 #[inline]
-pub fn tee<I: AsFd, O: AsFd>(
+pub fn tee<I: AsFd + ?Sized, O: AsFd + ?Sized>(
     fd_in: &I,
     fd_out: &O,
     size: usize,
@@ -45,11 +38,9 @@ pub fn tee<I: AsFd, O: AsFd>(
     sys::call!(sys_tee, fd_in.as_fd(), fd_out.as_fd(), size, flags.0).io2()
 }
 
-/// Splice user pages to/from a pipe.
-///
-/// Reference: `vmsplice(2)`.
+/// Splice user pages to/from a pipe (`vmsplice(2)`).
 #[inline]
-pub fn vmsplice<Fd: AsFd>(
+pub fn vmsplice<Fd: AsFd + ?Sized>(
     fd: &Fd,
     iov: &[IoVecMut<'_>],
     flags: SpliceFlags,
@@ -59,30 +50,23 @@ pub fn vmsplice<Fd: AsFd>(
 
 // ===== flags =====
 
-/// Flags for buffer copying operations.
-///
-/// Reference: `splice(2)`.
+/// Flags for buffer copying operations (`splice(2)`).
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[repr(transparent)]
 pub struct SpliceFlags(u32);
 
+flags::impl_bitops_simple!(SpliceFlags);
+
 impl SpliceFlags {
-    /// Attempt to move pages instead of copying.
-    ///
-    /// Unused for [`vmsplice`], and currently has no effect on [`tee`].
+    /// `SPLICE_F_MOVE`
     pub const MOVE: Self = Self(sys::SPLICE_F_MOVE);
-    /// Do not block on I/O.
+    /// `SPLICE_F_NONBLOCK`
     pub const NONBLOCK: Self = Self(sys::SPLICE_F_NONBLOCK);
-    /// More data will be coming in a subsequent splice.
-    ///
-    /// Currently has no effect on [`vmsplice`] and [`tee`].
+    /// `SPLICE_F_MORE`
     pub const MORE: Self = Self(sys::SPLICE_F_MORE);
-    /// The user pages are a gift to the kernel.
-    ///
-    /// Unused for [`splice`] and [`tee`].
+    /// `SPLICE_F_GIFT`
     pub const GIFT: Self = Self(sys::SPLICE_F_GIFT);
 }
-
-flags::impl_bitops_simple!(SpliceFlags);
 
 // ===== error =====
 

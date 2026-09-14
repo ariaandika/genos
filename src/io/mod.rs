@@ -1,9 +1,10 @@
 //! Input/Output operations.
 pub use iovec::{IoVec, IoVecMut};
-pub use flags::IOFlags;
-pub use read::{Read, ReadError, read};
-pub use write::{Write, WriteError};
+pub use flags::RWFlags;
+pub use read::{ReadError, read, pread, readv, preadv};
+pub use write::{WriteError, write, pwrite, writev, pwritev};
 pub use stream::{Stderr, Stdin, Stdout};
+pub use splice::{SpliceError, SpliceFlags, sendfile, splice, tee, vmsplice};
 
 /// Integer representing file size.
 ///
@@ -12,11 +13,10 @@ pub type Offset = crate::sys::off_t;
 
 mod iovec;
 mod flags;
+mod stream;
 mod read;
 mod write;
-mod stream;
-
-pub mod splice;
+mod splice;
 
 /// Write to standard output with a newline.
 #[macro_export]

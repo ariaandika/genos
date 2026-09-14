@@ -328,9 +328,9 @@ pub const sys_timerfd_settime: c_long = 286;
 pub const sys_timerfd_gettime: c_long = 287;
 pub const sys_accept4: c_long = 288;
 pub const sys_epoll_create1: c_long = 291;
-pub const sys_pwritev: c_long = 296;
 pub const sys_getrandom: c_long = 318;
 pub const sys_preadv2: c_long = 327;
+pub const sys_pwritev2: c_long = 328;
 pub const sys_clone3: c_long = 435;
 
 // source: arch/x86/include/uapi/asm/signal.h

@@ -1,67 +1,39 @@
 use crate::{flags, sys};
 
-// ===== ReadFlags =====
+// ===== RWFlags =====
 
-/// [`Read::preadv`] and [`Write::pwritev`] flags.
+/// [`preadv`] and [`pwritev`] flags.
 ///
-/// Reference: `readv2(2)`.
-///
-/// [`Read::preadv`]: crate::io::Read::preadv
-/// [`Write::pwritev`]: crate::io::Write::pwritev
+/// [`preadv`]: crate::io::preadv
+/// [`pwritev`]: crate::io::pwritev
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-pub struct IOFlags(i32);
+#[repr(transparent)]
+pub struct RWFlags(i32);
 
-flags::impl_bitops_simple!(IOFlags);
+flags::impl_bitops_simple!(RWFlags);
 
-impl IOFlags {
-    /// High priority read/write.
+impl RWFlags {
+    /// `RWF_HIPRI`
     pub const HIPRI: Self = Self(sys::RWF_HIPRI);
-    /// Do not wait for data which is not immediately available.
-    ///
-    /// Currently, this flag is meaningful only for [`Read::preadv`].
-    ///
-    /// [`Read::preadv`]: crate::io::Read::preadv
+    /// `RWF_NOWAIT`
     pub const NOWAIT: Self = Self(sys::RWF_NOWAIT);
-    /// Reads or writes to a regular file will prune instantiated page cache content when the
-    /// operation completes.
+    /// `RWF_DONTCACHE`
     pub const DONTCACHE: Self = Self(sys::RWF_DONTCACHE);
-
-    /// Provide a per-write equivalent of the `O_DSYNC` `open(2)` flag.
-    ///
-    /// This flag is meaningful only for [`Write::pwritev`].
-    ///
-    /// [`Write::pwritev`]: crate::io::Write::pwritev
+    /// `RWF_DSYNC`
     pub const DSYNC: Self = Self(sys::RWF_DSYNC);
-    /// Provide a per-write equivalent of the `O_SYNC` `open(2)` flag.
-    ///
-    /// This flag is meaningful only for [`Write::pwritev`].
-    ///
-    /// [`Write::pwritev`]: crate::io::Write::pwritev
+    /// `RWF_SYNC`
     pub const SYNC: Self = Self(sys::RWF_SYNC);
-    /// Provide a per-write equivalent of the `O_APPEND` `open(2)` flag.
-    ///
-    /// This flag is meaningful only for [`Write::pwritev`].
-    ///
-    /// [`Write::pwritev`]: crate::io::Write::pwritev
+    /// `RWF_APPEND`
     pub const APPEND: Self = Self(sys::RWF_APPEND);
-    /// Do not honor the `O_APPEND` `open(2)` flag.
-    ///
-    /// This flag is meaningful only for [`Write::pwritev`].
-    ///
-    /// [`Write::pwritev`]: crate::io::Write::pwritev
+    /// `RWF_NOAPPEND`
     pub const NOAPPEND: Self = Self(sys::RWF_NOAPPEND);
-    /// Requires that writes to regular files in block-based filesystems be issued with torn-write
-    /// protection.
-    ///
-    /// This flag is meaningful only for [`Write::pwritev`].
-    ///
-    /// [`Write::pwritev`]: crate::io::Write::pwritev
+    /// `RWF_ATOMIC`
     pub const ATOMIC: Self = Self(sys::RWF_ATOMIC);
 }
 
-impl From<IOFlags> for i32 {
+impl From<RWFlags> for i32 {
     #[inline]
-    fn from(value: IOFlags) -> Self {
+    fn from(value: RWFlags) -> Self {
         value.0
     }
 }
