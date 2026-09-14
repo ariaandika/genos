@@ -1,11 +1,11 @@
 //! [`File`] associated types.
-use crate::error::SysResExt;
-use crate::fd::{AsFd, OwnedFd};
+use core::{fmt, result};
+
+use crate::error::{ErrCode, SysResExt};
+use crate::fd::{AsFd, Open, OwnedFd};
 use crate::ffi::Char;
-use crate::fs::error::Kind;
-use crate::fs::{Error, Result};
-use crate::io::{Offset, Read, Write};
-use crate::{fd, flags, sys};
+use crate::io::Offset;
+use crate::{error, fd, sys};
 
 /// Open file descriptor.
 #[derive(Debug)]
@@ -15,11 +15,9 @@ fd::impl_fd_simple!(File);
 
 impl File {
     /// Opens specified file (`open(2)`).
-    ///
-    /// [`AccessMode`] can be OR-ed with [`OpenFlags`].
     #[inline]
-    pub fn open(path: &Char, mode: AccessMode) -> Result<Self> {
-        sys::call_rd!(sys_open, path, mode.0).fd(Kind::Open)
+    pub fn open(path: &Char, mode: Open) -> Result<Self> {
+        sys::call_rd!(sys_open, path, mode.raw()).fd(Kind::Open)
     }
 
     /// Create file if does not exists, open in write-only mode, and truncate to length 0
@@ -44,110 +42,73 @@ impl File {
     }
 }
 
-impl Read for File {
-    type Error = Error;
-}
-
-impl Write for File {
-    type Error = Error;
-}
-
-// ===== AccessMode =====
-
-/// [`File::open`] access mode.
-///
-/// Reference: `open(2)`.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-#[repr(transparent)]
-pub struct AccessMode(i32);
-
-flags::impl_bitops_simple!(AccessMode, OpenFlags);
-
-impl AccessMode {
-    /// Open file in read-only mode.
-    pub const RDONLY: Self = Self(sys::O_RDONLY);
-    /// Open file in write-only mode.
-    pub const WRONLY: Self = Self(sys::O_WRONLY);
-    /// Open file in read/write mode.
-    pub const RDWR: Self = Self(sys::O_RDWR);
-}
-
-// ===== OpenFlags =====
-
-/// [`File::open`] flags.
-///
-/// Reference: `open(2)`.
-#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
-#[repr(transparent)]
-pub struct OpenFlags(i32);
-
-flags::impl_bitops_simple!(OpenFlags);
-flags::impl_bitops_simple!(OpenFlags, AccessMode, Output = AccessMode);
-
-impl OpenFlags {
-    /// If path does not exist, create it as a regular file.
-    pub const CREAT: Self = Self(sys::O_CREAT);
-    /// Enable the close-on-exec flag for the new file descriptor.
-    pub const CLOEXEC: Self = Self(sys::O_CLOEXEC);
-    /// If path is not a directory, cause [`File::open`] to fail.
-    pub const DIRECTORY: Self = Self(sys::O_DIRECTORY);
-    /// Ensure that this call creates the file: if this flag is specified in conjunction with
-    /// [`CreateFlags::CREAT`], and path already exists, then [`File::open`] fails with the error
-    /// `EEXIST`.
-    pub const EXCL: Self = Self(sys::O_EXCL);
-    /// If path refers to a terminal device it will not become the process's controlling terminal
-    /// even if the process does not have one.
-    pub const NOCTTY: Self = Self(sys::O_NOCTTY);
-    /// If the trailing component of path is a symbolic link, then the open fails, with the error
-    /// `ELOOP`.
-    pub const NOFOLLOW: Self = Self(sys::O_NOFOLLOW);
-    /// Create an unnamed temporary regular file.
-    pub const TMPFILE: Self = Self(sys::O_TMPFILE);
-    /// If the file already exists and is a regular file and the access mode allows writing it will
-    /// be truncated to length 0.
-    pub const TRUNC: Self = Self(sys::O_TRUNC);
-}
-
-impl OpenFlags {
-    /// The file is opened in append mode.
-    pub const APPEND: Self = Self(sys::O_APPEND);
-    /// Enable signal-driven I/O: generate a signal (SIGIO by default) when input or output becomes
-    /// possible on this file descriptor.
-    pub const ASYNC: Self = Self(sys::O_ASYNC);
-    /// Try to minimize cache effects of the I/O to and from this file.
-    pub const DIRECT: Self = Self(sys::O_DIRECT);
-    /// Write operations on the file will complete according to the requirements of synchronized I/O
-    /// data integrity completion.
-    pub const DSYNC: Self = Self(sys::O_DSYNC);
-    /// (LFS) Allow files whose sizes cannot be represented in an `off_t` (but can be represented in
-    /// an `off64_t`) to be opened.
-    pub const LARGEFILE: Self = Self(sys::O_LARGEFILE);
-    /// Do not update the file last access time when the file is `read(2)`.
-    pub const NOATIME: Self = Self(sys::O_NOATIME);
-    /// Write operations on the file will complete according to the requirements of synchronized I/O
-    /// file integrity completion.
-    pub const SYNC: Self = Self(sys::O_SYNC);
-}
-
 // ===== Seek =====
 
-/// File seeking mode.
-///
-/// Reference: `lseek(2)`.
+/// File seeking mode (`lseek(2)`).
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct Seek(i32);
 
 impl Seek {
-    /// Set file offset to `offset` bytes.
-    pub const SET: Self = Self(sys::SEEK_SET);
-    /// Set file offset to current location plus offset bytes.
-    pub const CUR: Self = Self(sys::SEEK_CUR);
-    /// Set file offset to the size of the file plus offset bytes.
-    pub const END: Self = Self(sys::SEEK_END);
-    /// Adjust the file offset to the next location in the file greater than or equal to offset
-    /// containing data.
-    pub const DATA: Self = Self(sys::SEEK_DATA);
-    /// Adjust the file offset to the next hole in the file greater than or equal to offset.
-    pub const HOLE: Self = Self(sys::SEEK_HOLE);
+    /// `SEEK_SET`
+    pub const SET: Self = Self(SEEK_SET);
+    /// `SEEK_CUR`
+    pub const CUR: Self = Self(SEEK_CUR);
+    /// `SEEK_END`
+    pub const END: Self = Self(SEEK_END);
+    /// `SEEK_DATA`
+    pub const DATA: Self = Self(SEEK_DATA);
+    /// `SEEK_HOLE`
+    pub const HOLE: Self = Self(SEEK_HOLE);
 }
+
+// ===== Error =====
+
+/// Type alias for result of [`File`] operations.
+pub type Result<T> = result::Result<T, Error>;
+
+/// An error that may occur during any [`File`] operations.
+#[derive(Debug, Clone)]
+pub struct Error {
+    kind: Kind,
+    code: ErrCode,
+}
+
+#[derive(Debug, Clone)]
+pub(super) enum Kind {
+    Open,
+    Create,
+    Seek,
+    Rename,
+    Truncate,
+    Link,
+    Unlink,
+}
+
+error::impl_error_with_kind!(Error, Kind);
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { kind, code } = self;
+        let msg = match kind {
+            Kind::Open => "open",
+            Kind::Create => "create",
+            Kind::Seek => "seek",
+            Kind::Rename => "rename",
+            Kind::Truncate => "truncate",
+            Kind::Link => "link",
+            Kind::Unlink => "unlink",
+        };
+        write!(f, "failed to {msg} file: {code}")
+    }
+}
+
+// ===== extern =====
+
+// include/uapi/linux/fs.h
+
+const SEEK_SET: i32 = 0;
+const SEEK_CUR: i32 = 1;
+const SEEK_END: i32 = 2;
+const SEEK_DATA: i32 = 3;
+const SEEK_HOLE: i32 = 4;

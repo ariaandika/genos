@@ -103,12 +103,6 @@ pub type socklen_t = u32;
 
 // source: include/uapi/linux/fs.h
 
-pub const SEEK_SET: i32 = 0;
-pub const SEEK_CUR: i32 = 1;
-pub const SEEK_END: i32 = 2;
-pub const SEEK_DATA: i32 = 3;
-pub const SEEK_HOLE: i32 = 4;
-
 pub const RWF_HIPRI: i32 = 0x00000001;
 pub const RWF_DSYNC: i32 = 0x00000002;
 pub const RWF_SYNC: i32 = 0x00000004;

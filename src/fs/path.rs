@@ -5,8 +5,7 @@ use core::ptr::NonNull;
 use core::{ffi, marker};
 
 use crate::error::SysResExt;
-use crate::fs::Result;
-use crate::fs::error::Kind;
+use crate::fs::file::{Kind, Result};
 use crate::sys;
 
 /// File path.

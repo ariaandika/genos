@@ -3,7 +3,7 @@ use core::mem::MaybeUninit;
 use core::{fmt, result};
 
 use crate::error::{ErrCode, SysResExt};
-use crate::fd::{AsFd, OwnedFd};
+use crate::fd::{AsFd, Open, OwnedFd};
 use crate::{error, fd, flags, sys};
 
 // ===== Epoll =====
@@ -187,7 +187,7 @@ impl fmt::Display for Error {
 
 // include/uapi/linux/eventpoll.h
 
-const EPOLL_CLOEXEC: i32 = sys::O_CLOEXEC;
+const EPOLL_CLOEXEC: i32 = Open::CLOEXEC.raw();
 
 const EPOLL_CTL_ADD: i32 = 1;
 const EPOLL_CTL_DEL: i32 = 2;
