@@ -89,12 +89,6 @@ impl cmsghdr {
 /// source: `sockaddr(3type)`
 pub type socklen_t = u32;
 
-// source: include/uapi/linux/mman.h
-
-pub const MAP_SHARED: i32 = 0x01;
-pub const MAP_PRIVATE: i32 = 0x02;
-pub const MAP_SHARED_VALIDATE: i32 = 0x03;
-
 // source: include/uapi/linux/random.h
 
 pub const GRND_NONBLOCK: u32 = 0x0001;

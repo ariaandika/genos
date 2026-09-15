@@ -11,11 +11,3 @@ pub const SOL_SOCKET: i32 = 1;
 pub const SIG_BLOCK: i32 = 0;
 pub const SIG_UNBLOCK: i32 = 1;
 pub const SIG_SETMASK: i32 = 2;
-
-// source: include/uapi/asm-generic/mman-common.h
-
-pub const PROT_READ: i32 = 0x1;
-pub const PROT_WRITE: i32 = 0x2;
-pub const PROT_EXEC: i32 = 0x4;
-pub const PROT_NONE: i32 = 0x0;
-pub const MAP_ANONYMOUS: i32 = 0x20;
