@@ -1,5 +1,5 @@
 //! Memory allocation.
-pub use mmap::{Mmap, Prot, mmap, munmap};
+pub use mmap::{Prot, mmap, munmap};
 pub use brk::{brk, current_brk};
 pub use error::OutOfMemory;
 

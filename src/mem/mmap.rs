@@ -1,7 +1,6 @@
 //! [`mmap`] associated types.
 use core::ffi::c_void;
 use core::ptr::NonNull;
-use core::slice;
 
 use crate::error::{ErrCode, SysResExt};
 use crate::fd::BorrowedFd;
@@ -27,59 +26,6 @@ pub fn mmap(
 #[inline]
 pub fn munmap(addr: *mut c_void, length: usize) -> Result<(), Error> {
     sys::call_rd!(sys_munmap, addr, length).e2()
-}
-
-// ===== Mmap =====
-
-/// A handle to mapped files or devices in memory (`mmap(2)`).
-///
-/// This unmap the memory on drop.
-#[derive(Debug)]
-pub struct Mmap {
-    ptr: NonNull<u8>,
-    len: usize,
-}
-
-impl Drop for Mmap {
-    #[inline]
-    fn drop(&mut self) {
-        let _ = munmap(self.ptr.as_ptr().cast(), self.len);
-    }
-}
-
-impl Mmap {
-    /// Creates new [`Mmap`].
-    #[inline]
-    pub fn new(
-        addr: *mut c_void,
-        len: usize,
-        prot: Prot,
-        flags: Flags,
-        fd: BorrowedFd<'_>,
-        offset: i64,
-    ) -> Result<Self, Error> {
-        mmap(addr, len, prot, flags, fd, offset).map(|ptr| Self { ptr, len })
-    }
-
-    /// Returns the memory as slice bytes.
-    ///
-    /// # Safety
-    ///
-    /// Caller must have the read permission.
-    #[inline]
-    pub unsafe fn as_slice(&self) -> &[u8] {
-        unsafe { slice::from_raw_parts(self.ptr.as_ptr(), self.len) }
-    }
-
-    /// Returns the memory as mutable slice bytes.
-    ///
-    /// # Safety
-    ///
-    /// Caller must have the write permission.
-    #[inline]
-    pub unsafe fn as_mut_slice(&mut self) -> &mut [u8] {
-        unsafe { slice::from_raw_parts_mut(self.ptr.as_ptr(), self.len) }
-    }
 }
 
 // ===== Flags =====
