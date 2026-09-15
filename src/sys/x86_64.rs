@@ -280,6 +280,7 @@ pub const sys_open: c_long = 2;
 pub const sys_close: c_long = 3;
 pub const sys_lseek: c_long = 8;
 pub const sys_mmap: c_long = 9;
+pub const sys_mprotect: c_long = 10;
 pub const sys_munmap: c_long = 11;
 pub const sys_brk: c_long = 12;
 pub const sys_rt_sigprocmask: c_long = 14;

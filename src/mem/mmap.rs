@@ -25,6 +25,12 @@ pub fn mmap<Fd: AsFd + ?Sized>(
     sys::call_rd!(sys_mmap, addr, length, prot.0, flags.0, fd, offset).p2()
 }
 
+/// Set protection on a region of memory (`mprotect(2)`).
+#[inline]
+pub fn mprotect(addr: *mut c_void, size: usize, prot: Prot) -> Result<(), Error> {
+    sys::call_rd!(sys_mprotect, addr, size, prot.0).e2()
+}
+
 /// Unmap files or devices from memory (`munmap(2)`).
 #[inline]
 pub fn munmap(addr: *mut c_void, length: usize) -> Result<(), Error> {
