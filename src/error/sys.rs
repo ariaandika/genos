@@ -20,6 +20,16 @@ pub(crate) trait SysResExt: Sized {
         }
     }
 
+    /// Creates file descriptor from success result.
+    ///
+    /// In contrast with [`SysResExt::fd`], this uses error implementing [`FromErrCode`].
+    fn fd2<T: FromRawFd, E: FromErrCode>(self) -> Result<T, E> {
+        match self.inner() {
+            Ok(ok) => Ok(unsafe { T::from_raw_fd(ok as _) }),
+            Err(err) => Err(E::from_err_code(err)),
+        }
+    }
+
     /// Checks for error.
     fn e<E: ErrorKind>(self, kind: E) -> Result<(), E::Error> {
         match self.inner() {
