@@ -1,5 +1,5 @@
 use genos::ffi::Char;
-use genos::process::{CloneArgs, CloneFlags, exit};
+use genos::process::{CloneArgs, clone, exit};
 
 use crate::println;
 
@@ -11,7 +11,7 @@ extern "C" fn thread(name: &Char) -> ! {
 static NAME: &Char = Char::new(c"welcome");
 
 pub fn clone3_example() {
-    use CloneFlags as C;
+    use clone::Flags as C;
 
     let flags = C::VM | C::FS | C::FILES | C::SIGHAND | C::THREAD;
 
