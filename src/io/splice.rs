@@ -1,6 +1,7 @@
 use crate::error::{ErrCode, SysResExt};
 use crate::fd::AsFd;
-use crate::io::{IoVecMut, Offset};
+use crate::ffi::Off;
+use crate::io::IoVecMut;
 use crate::{error, flags, sys};
 
 /// Copies data between one file descriptor and another (`sendfile(2)`).
@@ -8,7 +9,7 @@ use crate::{error, flags, sys};
 pub fn sendfile<O: AsFd + ?Sized, I: AsFd + ?Sized>(
     out_fd: &O,
     in_fd: &I,
-    offset: Option<&mut Offset>,
+    offset: Option<&mut Off>,
     count: usize,
 ) -> Result<usize, SpliceError> {
     sys::call!(sys_sendfile, out_fd.as_fd(), in_fd.as_fd(), offset, count).io2()
@@ -18,9 +19,9 @@ pub fn sendfile<O: AsFd + ?Sized, I: AsFd + ?Sized>(
 #[inline]
 pub fn splice<I: AsFd + ?Sized, O: AsFd + ?Sized>(
     fd_in: &I,
-    off_in: Option<&mut Offset>,
+    off_in: Option<&mut Off>,
     fd_out: &O,
-    off_out: Option<&mut Offset>,
+    off_out: Option<&mut Off>,
     size: usize,
     flags: SpliceFlags,
 ) -> Result<usize, SpliceError> {

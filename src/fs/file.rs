@@ -3,8 +3,7 @@ use core::{fmt, result};
 
 use crate::error::{ErrCode, SysResExt};
 use crate::fd::{AsFd, Open, OwnedFd};
-use crate::ffi::Char;
-use crate::io::Offset;
+use crate::ffi::{Char, Mode, Off};
 use crate::{error, fd, sys};
 
 /// Open file descriptor.
@@ -23,13 +22,13 @@ impl File {
     /// Create file if does not exists, open in write-only mode, and truncate to length 0
     /// (`creat(2)`).
     #[inline]
-    pub fn create(path: &Char, mode: sys::mode_t) -> Result<Self> {
+    pub fn create(path: &Char, mode: Mode) -> Result<Self> {
         sys::call_rd!(sys_creat, path, mode).fd(Kind::Create)
     }
 
     /// Reposition read/write offset (`lseek(2)`).
     #[inline]
-    pub fn seek(&self, offset: Offset, seek: Seek) -> Result<Offset> {
+    pub fn seek(&self, offset: Off, seek: Seek) -> Result<Off> {
         sys::call_rd!(sys_lseek, self.as_fd(), offset, seek.0)
             .io(Kind::Seek)
             .map(|e| e as _)
@@ -37,7 +36,7 @@ impl File {
 
     /// Truncate file to a size of precisely length bytes (`ftruncate(2)`).
     #[inline]
-    pub fn truncate(&self, length: Offset) -> Result<()> {
+    pub fn truncate(&self, length: Off) -> Result<()> {
         sys::call_rd!(sys_ftruncate, self.as_fd(), length).e(Kind::Truncate)
     }
 }

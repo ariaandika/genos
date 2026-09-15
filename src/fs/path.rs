@@ -1,12 +1,11 @@
 use crate::error::SysResExt;
-use crate::ffi::Char;
+use crate::ffi::{Char, Off};
 use crate::fs::file::{Kind, Result};
-use crate::io::Offset;
 use crate::sys;
 
 /// Truncate file to a size of precisely length bytes (`truncate(2)`).
 #[inline]
-pub fn truncate(path: &Char, length: Offset) -> Result<()> {
+pub fn truncate(path: &Char, length: Off) -> Result<()> {
     sys::call_rd!(sys_truncate, path, length).e(Kind::Truncate)
 }
 

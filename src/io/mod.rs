@@ -6,11 +6,6 @@ pub use write::{WriteError, write, pwrite, writev, pwritev};
 pub use stream::{Stderr, Stdin, Stdout};
 pub use splice::{SpliceError, SpliceFlags, sendfile, splice, tee, vmsplice};
 
-/// Integer representing file size.
-///
-/// Reference: `off_t(3type)`.
-pub type Offset = crate::sys::off_t;
-
 mod iovec;
 mod flags;
 mod stream;

@@ -1,6 +1,7 @@
 use crate::error::{ErrCode, SysResExt};
 use crate::fd::AsFd;
-use crate::io::{IoVec, Offset, RWFlags};
+use crate::ffi::Off;
+use crate::io::{IoVec, RWFlags};
 use crate::{error, sys};
 
 /// Writes bytes from the buffer to this fd (`write(2)`).
@@ -11,7 +12,7 @@ pub fn write<Fd: AsFd + ?Sized>(fd: &Fd, buf: &[u8]) -> Result<usize, WriteError
 
 /// Writes bytes from the buffer to this fd at given offset (`pwrite(2)`).
 #[inline]
-pub fn pwrite<Fd: AsFd + ?Sized>(fd: &Fd, buf: &[u8], offset: Offset) -> Result<usize, WriteError> {
+pub fn pwrite<Fd: AsFd + ?Sized>(fd: &Fd, buf: &[u8], offset: Off) -> Result<usize, WriteError> {
     sys::call_rd!(sys_pwrite64, fd.as_fd(), buf, buf.len(), offset).io2::<WriteError>()
 }
 
@@ -26,7 +27,7 @@ pub fn writev<Fd: AsFd + ?Sized>(fd: &Fd, buf: &[IoVec<'_>]) -> Result<usize, Wr
 pub fn pwritev<Fd: AsFd + ?Sized>(
     fd: &Fd,
     buf: &[IoVec<'_>],
-    offset: Offset,
+    offset: Off,
     flags: RWFlags,
 ) -> Result<usize, WriteError> {
     sys::call_rd!(sys_pwritev2, fd.as_fd(), buf, buf.len(), offset, i32::from(flags))

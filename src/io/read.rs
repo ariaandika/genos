@@ -2,7 +2,8 @@ use core::mem::MaybeUninit;
 
 use crate::error::{ErrCode, SysResExt};
 use crate::fd::AsFd;
-use crate::io::{IoVecMut, Offset, RWFlags};
+use crate::ffi::Off;
+use crate::io::{IoVecMut, RWFlags};
 use crate::{error, sys};
 
 /// Read bytes from this fd into the buffer (`read(2)`).
@@ -16,7 +17,7 @@ pub fn read<Fd: AsFd + ?Sized>(fd: &Fd, buf: &mut [MaybeUninit<u8>]) -> Result<u
 pub fn pread<Fd: AsFd + ?Sized>(
     fd: &Fd,
     buf: &mut [MaybeUninit<u8>],
-    offset: Offset,
+    offset: Off,
 ) -> Result<usize, ReadError> {
     sys::call!(sys_pread64, fd.as_fd(), buf.as_mut_ptr(), buf.len(), offset).io2::<ReadError>()
 }
@@ -32,7 +33,7 @@ pub fn readv<Fd: AsFd + ?Sized>(fd: &Fd, buf: &[IoVecMut<'_>]) -> Result<usize, 
 pub fn preadv<Fd: AsFd + ?Sized>(
     fd: &Fd,
     buf: &[IoVecMut<'_>],
-    offset: Offset,
+    offset: Off,
     flags: RWFlags,
 ) -> Result<usize, ReadError> {
     sys::call!(sys_preadv2, fd.as_fd(), buf, buf.len(), offset, i32::from(flags)).io2::<ReadError>()
