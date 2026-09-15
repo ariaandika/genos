@@ -3,22 +3,25 @@ use core::ffi::c_void;
 use core::ptr::NonNull;
 
 use crate::error::{ErrCode, SysResExt};
-use crate::fd::BorrowedFd;
+use crate::fd::AsFd;
 use crate::ffi::Off;
 use crate::{error, flags, sys};
 
 // ===== mmap =====
 
 /// Map files or devices into memory (`mmap(2)`).
+///
+/// If the `fd` is `None`, it replaced with value of `-1`. This is used in anonymous mapping.
 #[inline]
-pub fn mmap(
+pub fn mmap<Fd: AsFd + ?Sized>(
     addr: *mut c_void,
     length: usize,
     prot: Prot,
     flags: Flags,
-    fd: BorrowedFd<'_>,
+    fd: Option<&Fd>,
     offset: Off,
-) -> Result<NonNull<u8>, Error> {
+) -> Result<NonNull<c_void>, Error> {
+    let fd = fd.map_or(-1, <_>::as_raw_fd);
     sys::call_rd!(sys_mmap, addr, length, prot.0, flags.0, fd, offset).p2()
 }
 
@@ -48,7 +51,7 @@ impl Flags {
     /// `MAP_FIXED`
     pub const FIXED: Self = Self(MAP_FIXED);
     /// `MAP_ANONYMOUS`
-    pub const ANONYMUS: Self = Self(MAP_ANONYMOUS);
+    pub const ANONYMOUS: Self = Self(MAP_ANONYMOUS);
     /// `MAP_POPULATE`
     pub const POPULATE: Self = Self(MAP_POPULATE);
     /// `MAP_NONBLOCK`
@@ -100,7 +103,7 @@ impl Prot {
 
 // ===== Error =====
 
-/// An error that may occur when mapping memory.
+/// An error that may occur during [`mmap`] operation.
 #[derive(Clone, Copy)]
 pub struct Error(ErrCode);
 
