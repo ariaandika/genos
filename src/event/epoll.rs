@@ -25,7 +25,7 @@ impl Epoll {
     ///
     /// [`InputFlags`] can be added by `OR`-ing with [`EventType`].
     #[inline]
-    pub fn add<Fd: AsFd>(&self, fd: &Fd, events: EventType, data: u64) -> Result<()> {
+    pub fn add<Fd: AsFd + ?Sized>(&self, fd: &Fd, events: EventType, data: u64) -> Result<()> {
         self.epoll_ctl(EPOLL_CTL_ADD, fd, &Event { events, data }, Kind::Add)
     }
 
@@ -33,18 +33,21 @@ impl Epoll {
     ///
     /// [`InputFlags`] can be added by `OR`-ing with [`EventType`].
     #[inline]
-    pub fn modify<Fd: AsFd>(&self, fd: &Fd, events: EventType, data: u64) -> Result<()> {
+    pub fn modify<Fd: AsFd + ?Sized>(&self, fd: &Fd, events: EventType, data: u64) -> Result<()> {
         self.epoll_ctl(EPOLL_CTL_MOD, fd, &Event { events, data }, Kind::Mod)
     }
 
     /// Remove (deregister) the target fd from the interest list (`epoll_ctl(2)`).
     #[inline]
-    pub fn delete<Fd: AsFd>(&self, fd: &Fd) -> Result<()> {
+    pub fn delete<Fd: AsFd + ?Sized>(&self, fd: &Fd) -> Result<()> {
         self.epoll_ctl(EPOLL_CTL_DEL, fd, 0 as _, Kind::Del)
     }
 
     #[inline]
-    fn epoll_ctl<Fd: AsFd>(&self, op: i32, fd: &Fd, ev: *const Event, er: Kind) -> Result<()> {
+    fn epoll_ctl<Fd>(&self, op: i32, fd: &Fd, ev: *const Event, er: Kind) -> Result<()>
+    where
+        Fd: AsFd + ?Sized,
+    {
         sys::call_rd!(sys_epoll_ctl, self.as_fd(), op, fd.as_fd(), ev).e(er)
     }
 
