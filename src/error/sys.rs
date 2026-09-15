@@ -1,5 +1,3 @@
-use core::ptr;
-
 use crate::error::{ErrCode, ErrorKind, FromErrCode};
 use crate::fd::FromRawFd;
 use crate::sys::SysRes;
@@ -48,17 +46,6 @@ pub(crate) trait SysResExt: Sized {
     /// In contrast with [`SysResExt::io`], this uses error implementing [`FromErrCode`].
     fn io2<E: FromErrCode>(self) -> Result<usize, E> {
         self.inner().map_err(E::from_err_code)
-    }
-
-    /// Returns non-null pointer from success result.
-    fn p2<T, E: FromErrCode>(self) -> Result<ptr::NonNull<T>, E> {
-        let res = self.into_inner();
-        if res > 0 {
-            // SAFETY: `res > 0` means `res != 0`
-            Ok(unsafe { ptr::NonNull::new_unchecked(res as *mut T) })
-        } else {
-            Err(E::from_err_code(ErrCode::sys(res)))
-        }
     }
 }
 

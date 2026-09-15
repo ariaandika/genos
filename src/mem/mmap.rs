@@ -1,6 +1,7 @@
 //! [`mmap`] associated types.
 use core::ffi::c_void;
 use core::ptr::NonNull;
+use core::{fmt, result};
 
 use crate::error::{ErrCode, SysResExt};
 use crate::fd::AsFd;
@@ -20,21 +21,23 @@ pub fn mmap<Fd: AsFd + ?Sized>(
     flags: Flags,
     fd: Option<&Fd>,
     offset: Off,
-) -> Result<NonNull<c_void>, Error> {
+) -> Result<NonNull<c_void>> {
     let fd = fd.map_or(-1, <_>::as_raw_fd);
-    sys::call_rd!(sys_mmap, addr, length, prot.0, flags.0, fd, offset).p2()
+    sys::call_rd!(sys_mmap, addr, length, prot.0, flags.0, fd, offset)
+        .io(Kind::Map)
+        .map(|e| unsafe { NonNull::new_unchecked(e as *mut c_void) })
 }
 
 /// Set protection on a region of memory (`mprotect(2)`).
 #[inline]
-pub fn mprotect(addr: *mut c_void, size: usize, prot: Prot) -> Result<(), Error> {
-    sys::call_rd!(sys_mprotect, addr, size, prot.0).e2()
+pub fn mprotect(addr: *mut c_void, size: usize, prot: Prot) -> Result<()> {
+    sys::call_rd!(sys_mprotect, addr, size, prot.0).e(Kind::Mprotect)
 }
 
 /// Unmap files or devices from memory (`munmap(2)`).
 #[inline]
-pub fn munmap(addr: *mut c_void, length: usize) -> Result<(), Error> {
-    sys::call_rd!(sys_munmap, addr, length).e2()
+pub fn munmap(addr: *mut c_void, length: usize) -> Result<()> {
+    sys::call_rd!(sys_munmap, addr, length).e(Kind::Unmap)
 }
 
 // ===== Flags =====
@@ -109,11 +112,36 @@ impl Prot {
 
 // ===== Error =====
 
-/// An error that may occur during [`mmap`] operation.
-#[derive(Clone, Copy)]
-pub struct Error(ErrCode);
+/// The result of memory mapping operation.
+pub type Result<T, E = Error> = result::Result<T, E>;
 
-error::impl_error_os_simple!(Error, "map memory");
+/// An error that may occur during any memory mapping operation.
+#[derive(Debug, Clone)]
+pub struct Error {
+    kind: Kind,
+    code: ErrCode,
+}
+
+#[derive(Debug, Clone)]
+enum Kind {
+    Map,
+    Mprotect,
+    Unmap,
+}
+
+error::impl_error_with_kind!(Error, Kind);
+
+impl fmt::Display for Error {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let Self { kind, code } = self;
+        let msg = match kind {
+            Kind::Map => "create memory mapping",
+            Kind::Mprotect => "set protection on memory",
+            Kind::Unmap => "unmap memory mapping",
+        };
+        write!(f, "failed to {msg}: {code}")
+    }
+}
 
 // ===== extern =====
 
