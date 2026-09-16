@@ -89,12 +89,6 @@ impl cmsghdr {
 /// source: `sockaddr(3type)`
 pub type socklen_t = u32;
 
-// source: include/uapi/linux/random.h
-
-pub const GRND_NONBLOCK: u32 = 0x0001;
-pub const GRND_RANDOM: u32 = 0x0002;
-pub const GRND_INSECURE: u32 = 0x0004;
-
 // source: include/uapi/linux/signalfd.h
 
 pub const SFD_CLOEXEC: i32 = sys::O_CLOEXEC;
