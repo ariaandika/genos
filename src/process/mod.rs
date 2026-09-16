@@ -1,5 +1,5 @@
 //! Process management.
-pub use process::{KillError, Process, execve, exit};
+pub use process::{ForkError, KillError, execve, exit, fork, getpid, getppid, kill};
 #[doc(inline)]
 pub use clone::{CloneArgs, clone};
 

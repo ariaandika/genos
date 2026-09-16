@@ -1,77 +1,55 @@
 use core::ffi::CStr;
-use core::num::NonZeroI32;
 
 use crate::error::{ErrCode, SysResExt};
-use crate::ffi::Char;
+use crate::ffi::{Char, Pid};
 use crate::signal::Signo;
 use crate::{error, sys};
 
-/// Terminate process with given status code.
+/// Returns process ID (PID) of the calling process (`getpid(2)`).
+#[inline]
+pub fn getpid() -> Pid {
+    sys::call_rd!(sys_getpid).into_inner() as Pid
+}
+
+/// Returns process ID (PID) of the parent of the calling process (`getppid(2)`).
+#[inline]
+pub fn getppid() -> Pid {
+    sys::call_rd!(sys_getppid).into_inner() as Pid
+}
+
+/// Create child process by duplicating the calling process (`fork(2)`).
+#[inline]
+pub fn fork() -> Result<Pid, ForkError> {
+    sys::call_rd!(sys_fork).io2().map(|e| e as _)
+}
+
+/// Executes the program referred to by path (`execve(2)`).
+#[inline]
+pub fn execve(path: &CStr, argv: &Option<&Char>, envp: &Option<&Char>) -> ErrCode {
+    ErrCode::sys(sys::call_rd!(sys_execve, path, argv, envp).into_inner() as _)
+}
+
+/// Send a signal to process this struct refers to (`kill(2)`).
+#[inline]
+pub fn kill(pid: Pid, sig: Signo) -> Result<(), KillError> {
+    sys::call_rd!(sys_kill, pid, i32::from(sig)).e2()
+}
+
+/// Terminate process with given status code (`exit(2)`).
 #[inline]
 pub fn exit(status: i32) -> ! {
     unsafe { sys::call1_noret(sys::sys_exit, status as usize) }
 }
 
-/// Executes the program referred to by path.
-#[inline]
-pub fn execve(path: &CStr, argv: &Option<&Char>, envp: &Option<&Char>) -> ErrCode {
-    ErrCode::new(-sys::call_rd!(sys_execve, path, argv, envp).into_inner() as _)
-}
-
-/// Process handle.
-#[derive(Debug, Clone)]
-pub struct Process(NonZeroI32);
-
-impl Process {
-    /// Create [`Process`] referencing caller process.
-    #[inline]
-    pub fn this() -> Self {
-        let pid = sys::call_rd!(sys_getpid).into_inner();
-        // SAFETY: have faith from the kernel
-        Self(unsafe { NonZeroI32::new_unchecked(pid as _) })
-    }
-
-    /// Create [`Process`] referencing callers parent process.
-    ///
-    /// Returns `None` if parent is in a different PID namespace.
-    #[inline]
-    pub fn parent() -> Option<Self> {
-        let ppid = sys::call_rd!(sys_getppid).into_inner();
-        NonZeroI32::new(ppid as _).map(Self)
-    }
-
-    /// Create child process by duplicating the calling process.
-    ///
-    /// Returns `None` if this execution is in the child process.
-    #[inline]
-    pub fn fork() -> Result<Option<Process>, ForkError> {
-        sys::call_rd!(sys_fork)
-            .io2()
-            .map(|pid| NonZeroI32::new(pid as _).map(Self))
-    }
-
-    /// Returns the process id.
-    #[inline]
-    pub fn id(&self) -> i32 {
-        self.0.get()
-    }
-
-    /// Send a signal to process this struct refers to.
-    #[inline]
-    pub fn kill(&self, sig: Signo) -> Result<(), KillError> {
-        sys::call_rd!(sys_kill, self.0.get(), i32::from(sig)).e2()
-    }
-}
-
 // ===== errors =====
 
-/// An error that may occur when `fork`-ing a process.
+/// An error that may occur during [`fork`] operation.
 #[derive(Clone, Copy)]
 pub struct ForkError(ErrCode);
 
 error::impl_error_os_simple!(ForkError, "fork process");
 
-/// An error that may occur when sending signal to a process.
+/// An error that may occur during [`kill`] operation.
 #[derive(Clone, Copy)]
 pub struct KillError(ErrCode);
 
