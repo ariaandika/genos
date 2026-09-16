@@ -1,6 +1,6 @@
-#![allow(non_upper_case_globals, non_camel_case_types, unsafe_op_in_unsafe_fn)]
+#![expect(non_upper_case_globals, unsafe_op_in_unsafe_fn)]
 use core::arch::asm;
-use core::ffi::{self, c_long, c_ulong};
+use core::ffi::c_long;
 
 use crate::sys::SysRes;
 pub use crate::sys::asm_generic::*;
@@ -334,67 +334,3 @@ pub const sys_memfd_create: c_long = 319;
 pub const sys_preadv2: c_long = 327;
 pub const sys_pwritev2: c_long = 328;
 pub const sys_clone3: c_long = 435;
-
-// source: arch/x86/include/uapi/asm/signal.h
-
-pub type sigset_t = ffi::c_ulong;
-
-pub const SIGHUP: i32 = 1;
-pub const SIGINT: i32 = 2;
-pub const SIGQUIT: i32 = 3;
-pub const SIGILL: i32 = 4;
-// pub const SIGTRAP: i32 = 5;
-pub const SIGABRT: i32 = 6;
-pub const SIGIOT: i32 = 6;
-// pub const SIGBUS: i32 = 7;
-pub const SIGFPE: i32 = 8;
-pub const SIGKILL: i32 = 9;
-pub const SIGUSR1: i32 = 10;
-pub const SIGSEGV: i32 = 11;
-pub const SIGUSR2: i32 = 12;
-pub const SIGPIPE: i32 = 13;
-pub const SIGALRM: i32 = 14;
-pub const SIGTERM: i32 = 15;
-// pub const SIGSTKFLT: i32 = 16;
-pub const SIGCHLD: i32 = 17;
-pub const SIGCONT: i32 = 18;
-// pub const SIGSTOP: i32 = 19;
-// pub const SIGTSTP: i32 = 20;
-// pub const SIGTTIN: i32 = 21;
-// pub const SIGTTOU: i32 = 22;
-// pub const SIGURG: i32 = 23;
-// pub const SIGXCPU: i32 = 24;
-// pub const SIGXFSZ: i32 = 25;
-// pub const SIGVTALRM: i32 = 26;
-// pub const SIGPROF: i32 = 27;
-// pub const SIGWINCH: i32 = 28;
-// pub const SIGIO: i32 = 29;
-// pub const SIGPOLL: i32 = SIGIO;
-
-// source: arch/x86/include/asm/signal.h
-// simplified for 64 bit only
-
-#[cfg(target_pointer_width = "64")]
-pub const fn sigemptyset() -> sigset_t {
-    0
-}
-
-#[cfg(target_pointer_width = "64")]
-pub const fn sigfillset() -> sigset_t {
-    -1i64 as u64
-}
-
-#[cfg(target_pointer_width = "64")]
-pub const fn sigaddset(set: &mut sigset_t, sig: i32) {
-    *set |= 1 << (sig - 1) as c_ulong;
-}
-
-#[cfg(target_pointer_width = "64")]
-pub const fn sigdelset(set: &mut sigset_t, sig: i32) {
-    *set &= !(1 << (sig - 1) as c_ulong);
-}
-
-#[cfg(target_pointer_width = "64")]
-pub const fn sigismember(set: &sigset_t, sig: i32) -> u64 {
-    1 & *set >> (sig - 1) as c_ulong
-}
