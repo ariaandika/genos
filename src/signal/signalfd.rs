@@ -1,11 +1,10 @@
 //! [`Signalfd`] associated types.
-use core::mem::{self, MaybeUninit};
 use core::{fmt, result};
 
 use crate::error::{ErrCode, SysResExt};
-use crate::fd::OwnedFd;
+use crate::fd::{AsFd, Open, OwnedFd};
 use crate::signal::{Signo, Sigset};
-use crate::{error, fd, flags, io, sys};
+use crate::{error, fd, flags, sys};
 
 // ===== Signalfd =====
 
@@ -16,38 +15,71 @@ pub struct Signalfd(OwnedFd);
 fd::impl_fd_simple!(Signalfd);
 
 impl Signalfd {
-    /// Create new [`Signalfd`].
+    /// Create new [`Signalfd`] (`signalfd(2)`).
     #[inline]
-    pub fn new(sigset: &Sigset, flags: Flags) -> Result<Self> {
-        sys::call_rd!(sys_signalfd, -1, sigset.as_ref(), flags.0).fd(Kind::Create)
+    pub fn create(sigset: &Sigset, flags: Flags) -> Result<Self> {
+        signalfd(-1, sigset, flags).fd(Kind::Create)
     }
 
-    /// Read for pending signal.
+    /// Replace the associated signal set (`signalfd(2)`).
     #[inline]
-    pub fn read(&self) -> Result<Siginfo> {
-        let mut buf = [const { MaybeUninit::uninit() }; size_of::<Siginfo>()];
-        let mut n = 0;
-        while n < buf.len()
-            && let Some(buf) = buf.get_mut(n..)
-        {
-            n += io::read(self, buf)?;
-        }
-        Ok(unsafe { mem::transmute::<[MaybeUninit<u8>; _], Siginfo>(buf) })
+    pub fn set_signal(&self, sigset: &Sigset) -> Result<()> {
+        signalfd(self.as_raw_fd(), sigset, <_>::default()).e(Kind::Set)
     }
+}
+
+fn signalfd(fd: i32, sigset: &Sigset, flags: Flags) -> impl SysResExt {
+    sys::call_rd!(sys_signalfd, fd, sigset.as_ref(), flags.0)
 }
 
 // ===== Siginfo =====
 
-/// Pending signal information.
+/// Pending signal information (`signalfd(2)`).
 #[derive(Debug, Clone)]
-#[repr(transparent)]
-pub struct Siginfo(sys::signalfd_siginfo);
+#[repr(C)]
+pub struct Siginfo {
+    /// `signalfd_siginfo.ssi_signo`
+    pub signo: u32,
+    /// `signalfd_siginfo.ssi_errno`
+    pub errno: i32,
+    /// `signalfd_siginfo.ssi_code`
+    pub code: i32,
+    /// `signalfd_siginfo.ssi_pid`
+    pub pid: u32,
+    /// `signalfd_siginfo.ssi_uid`
+    pub uid: u32,
+    /// `signalfd_siginfo.ssi_fd`
+    pub fd: i32,
+    /// `signalfd_siginfo.ssi_tid`
+    pub tid: u32,
+    /// `signalfd_siginfo.ssi_band`
+    pub band: u32,
+    /// `signalfd_siginfo.ssi_overrun`
+    pub overrun: u32,
+    /// `signalfd_siginfo.ssi_trapno`
+    pub trapno: u32,
+    /// `signalfd_siginfo.ssi_status`
+    pub status: i32,
+    /// `signalfd_siginfo.ssi_int`
+    pub int: i32,
+    /// `signalfd_siginfo.ssi_ptr`
+    pub ptr: u64,
+    /// `signalfd_siginfo.ssi_utime`
+    pub utime: u64,
+    /// `signalfd_siginfo.ssi_stime`
+    pub stime: u64,
+    /// `signalfd_siginfo.ssi_addr`
+    pub addr: u64,
+    /// `signalfd_siginfo.ssi_addr_lsb`
+    pub addr_lsb: u16,
+    __pad: [u8; 46],
+}
 
 impl Siginfo {
     /// Returns the pending [`Signo`].
     #[inline]
     pub fn signo(&self) -> Signo {
-        Signo::from_raw(self.0.ssi_signo)
+        Signo::from_raw(self.signo)
     }
 }
 
@@ -58,19 +90,14 @@ impl Siginfo {
 #[repr(transparent)]
 pub struct Flags(i32);
 
+flags::impl_bitops_simple!(Flags);
+
 impl Flags {
     /// Set the close-on-exec (FD_CLOEXEC) flag on the new fd.
-    pub const CLOEXEC: Self = Self(sys::SFD_CLOEXEC);
+    pub const CLOEXEC: Self = Self(SFD_CLOEXEC);
     /// Set the `O_NONBLOCK` file status flag on the new fd.
-    pub const NONBLOCK: Self = Self(sys::SFD_NONBLOCK);
+    pub const NONBLOCK: Self = Self(SFD_NONBLOCK);
 }
-
-impl flags::OpenFlag for Flags {
-    const CLOEXEC: Self = Self::CLOEXEC;
-    const NONBLOCK: Self = Self::NONBLOCK;
-}
-
-flags::impl_bitops_simple!(Flags);
 
 // ===== Error =====
 
@@ -87,25 +114,25 @@ pub struct Error {
 #[derive(Debug, Clone, Copy)]
 enum Kind {
     Create,
-    Read,
+    Set,
 }
 
 error::impl_error_with_kind!(Error, Kind);
-
-impl From<io::ReadError> for Error {
-    #[inline]
-    fn from(value: io::ReadError) -> Self {
-        Self { kind: Kind::Read, code: value.into() }
-    }
-}
 
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let Self { kind, code } = self;
         let msg = match kind {
             Kind::Create => "create signalfd",
-            Kind::Read => "read signalfd pending signal",
+            Kind::Set => "set signalfd sigset",
         };
         write!(f, "failed to {msg}: {code}")
     }
 }
+
+// ===== extern =====
+
+// include/uapi/linux/signalfd.h
+
+const SFD_CLOEXEC: i32 = Open::CLOEXEC.raw();
+const SFD_NONBLOCK: i32 = Open::NONBLOCK.raw();
