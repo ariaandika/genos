@@ -1,3 +1,4 @@
+//! [`Clock`] associated types.
 use core::mem::MaybeUninit;
 use core::{fmt, result};
 
@@ -8,41 +9,37 @@ use crate::time::Timespec;
 
 // ===== Clock =====
 
-/// Clock Identofier.
-///
-/// Reference: `clock_getres(2)`.
+/// Clock Identifier.
 #[derive(Debug, Clone, Copy)]
 #[repr(transparent)]
 pub struct Clock(i32);
 
 impl Clock {
-    /// A settable system-wide real-time clock.
-    pub const REALTIME: Self = Self(sys::CLOCK_REALTIME);
-    /// A nonsettable monotonically increasing clock that measures time from some unspecified point
-    /// in the past that does not change after system startup.
-    pub const MONOTONIC: Self = Self(sys::CLOCK_MONOTONIC);
-    /// Like CLOCK_MONOTONIC, this is a monotonically increasing clock.
-    pub const BOOTTIME: Self = Self(sys::CLOCK_BOOTTIME);
-    /// This clock is like [`Clock::REALTIME`], but will wake the system if it is suspended.
-    pub const REALTIME_ALARM: Self = Self(sys::CLOCK_REALTIME_ALARM);
-    /// This clock is like [`Clock::BOOTTIME`], but will wake the system if it is suspended.
-    pub const BOOTTIME_ALARM: Self = Self(sys::CLOCK_BOOTTIME_ALARM);
-    /// Similar to [`Clock::MONOTONIC`], but provides access to a raw hardware-based time that is
-    /// not sub‐ ject to frequency adjustments.
-    pub const MONOTONIC_RAW: Self = Self(sys::CLOCK_MONOTONIC_RAW);
-    /// A faster but less precise version of [`Clock::REALTIME`].
-    pub const REALTIME_COARSE: Self = Self(sys::CLOCK_REALTIME_COARSE);
-    /// A faster but less precise version of [`Clock::MONOTONIC`].
-    pub const MONOTONIC_COARSE: Self = Self(sys::CLOCK_MONOTONIC_COARSE);
-    /// A system-wide clock derived from wall-clock time but counting leap seconds.
-    pub const TAI: Self = Self(sys::CLOCK_TAI);
+    /// `CLOCK_REALTIME`
+    pub const REALTIME: Self = Self(CLOCK_REALTIME);
+    /// `CLOCK_MONOTONIC`
+    pub const MONOTONIC: Self = Self(CLOCK_MONOTONIC);
+    /// `CLOCK_BOOTTIME`
+    pub const BOOTTIME: Self = Self(CLOCK_BOOTTIME);
+    /// `CLOCK_REALTIME_ALARM`
+    pub const REALTIME_ALARM: Self = Self(CLOCK_REALTIME_ALARM);
+    /// `CLOCK_BOOTTIME_ALARM`
+    pub const BOOTTIME_ALARM: Self = Self(CLOCK_BOOTTIME_ALARM);
+    /// `CLOCK_MONOTONIC_RAW`
+    pub const MONOTONIC_RAW: Self = Self(CLOCK_MONOTONIC_RAW);
+    /// `CLOCK_REALTIME_COARSE`
+    pub const REALTIME_COARSE: Self = Self(CLOCK_REALTIME_COARSE);
+    /// `CLOCK_MONOTONIC_COARSE`
+    pub const MONOTONIC_COARSE: Self = Self(CLOCK_MONOTONIC_COARSE);
+    /// `CLOCK_TAI`
+    pub const TAI: Self = Self(CLOCK_TAI);
 }
 
 impl Clock {
     /// Symbol name for [`Clock::time`] exported by vDSO.
     pub const GETTIME_VDSO_SYM: &Char = Char::new(c"__vdso_clock_gettime");
 
-    /// Finds the resolution (precision) of this clock.
+    /// Finds the resolution (precision) of this clock (`clock_getres(2)`).
     #[inline]
     pub fn res(self) -> Result<Timespec> {
         let mut ts = MaybeUninit::uninit();
@@ -50,7 +47,7 @@ impl Clock {
         Ok(unsafe { ts.assume_init() })
     }
 
-    /// Retrieve the time of this clock.
+    /// Retrieve the time of this clock (`clock_gettime(2)`).
     #[inline]
     pub fn time(self) -> Result<Timespec> {
         let mut ts = MaybeUninit::uninit();
@@ -58,7 +55,7 @@ impl Clock {
         Ok(unsafe { ts.assume_init() })
     }
 
-    /// Set the time of this clock.
+    /// Set the time of this clock (`clock_settime(2)`).
     #[inline]
     pub fn set_time(self, time: &Timespec) -> Result<()> {
         sys::call_rd!(sys_clock_settime, self.0, time).e(Kind::Set)
@@ -104,3 +101,19 @@ impl fmt::Display for Error {
         write!(f, "failed to {msg}: {code}")
     }
 }
+
+// ===== extern =====
+
+// include/uapi/linux/time.h
+
+const CLOCK_REALTIME: i32 = 0;
+const CLOCK_MONOTONIC: i32 = 1;
+// const CLOCK_PROCESS_CPUTIME_ID: i32 = 2;
+// const CLOCK_THREAD_CPUTIME_ID: i32 = 3;
+const CLOCK_MONOTONIC_RAW: i32 = 4;
+const CLOCK_REALTIME_COARSE: i32 = 5;
+const CLOCK_MONOTONIC_COARSE: i32 = 6;
+const CLOCK_BOOTTIME: i32 = 7;
+const CLOCK_REALTIME_ALARM: i32 = 8;
+const CLOCK_BOOTTIME_ALARM: i32 = 9;
+const CLOCK_TAI: i32 = 11;
