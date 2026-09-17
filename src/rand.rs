@@ -7,7 +7,7 @@ use crate::{error, flags, sys};
 /// Generate a random number to the given buffer (`getrandom(2)`).
 #[inline]
 pub fn getrandom(buf: &mut [MaybeUninit<u8>], flags: Flags) -> Result<usize, Error> {
-    sys::call!(sys_getrandom, &mut *buf, buf.len(), flags.0).io2()
+    sys::call!(sys_getrandom, buf.as_mut_ptr(), buf.len(), flags.0).io2()
 }
 
 // ===== Flags =====

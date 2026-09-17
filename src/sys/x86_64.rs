@@ -2,275 +2,7 @@
 use core::arch::asm;
 use core::ffi::c_long;
 
-use crate::sys::SysRes;
 pub use crate::sys::asm_generic::*;
-
-// syscall arguments use register-sized types
-// syscall return values use register-sized types
-//
-// `man syscall(2)`
-//
-// # Architecture Calling Convention
-//
-// Registers used to pass the system call arguments.
-//
-// Arch/ABI      arg1  arg2  arg3  arg4  arg5  arg6  arg7  Notes
-// ──────────────────────────────────────────────────────────────
-// x86-64        rdi   rsi   rdx   r10   r8    r9    -
-//
-// # ASM
-//
-// "rax" contains syscall nr as input, then syscall returns the value back to it
-//
-// More on Rust inline assembly: https://doc.rust-lang.org/reference/inline-assembly.html
-
-#[inline]
-pub(crate) unsafe fn call0_rd(nr: c_long) -> SysRes {
-    let ret;
-    asm!(
-        "syscall",
-        inlateout("rax") nr => ret,
-        lateout("rcx") _,
-        lateout("r11") _,
-        options(nostack, preserves_flags, readonly)
-    );
-    SysRes::new(ret)
-}
-
-#[inline]
-pub(crate) unsafe fn call1_rd(nr: c_long, a1: usize) -> SysRes {
-    let ret;
-    asm!(
-        "syscall",
-        inlateout("rax") nr => ret,
-        in("rdi") a1,
-        lateout("rcx") _,
-        lateout("r11") _,
-        options(nostack, preserves_flags, readonly)
-    );
-    SysRes::new(ret)
-}
-
-#[inline]
-pub(crate) unsafe fn call1_noret(nr: c_long, a1: usize) -> ! {
-    // [ud2]: <https://doc.rust-lang.org/reference/inline-assembly.html#r-asm.options.supported-options.noreturn>
-    asm!(
-        "syscall",
-        "ud2",
-        in("rax") nr,
-        in("rdi") a1,
-        options(nostack, noreturn)
-    )
-}
-
-#[inline]
-pub(crate) unsafe fn call2(nr: c_long, a1: usize, a2: usize) -> SysRes {
-    let ret;
-    asm!(
-        "syscall",
-        inlateout("rax") nr => ret,
-        in("rdi") a1,
-        in("rsi") a2,
-        lateout("rcx") _,
-        lateout("r11") _,
-        options(nostack, preserves_flags)
-    );
-    SysRes::new(ret)
-}
-
-#[inline]
-pub(crate) unsafe fn call2_rd(nr: c_long, a1: usize, a2: usize) -> SysRes {
-    let ret;
-    asm!(
-        "syscall",
-        inlateout("rax") nr => ret,
-        in("rdi") a1,
-        in("rsi") a2,
-        lateout("rcx") _,
-        lateout("r11") _,
-        options(nostack, preserves_flags, readonly)
-    );
-    SysRes::new(ret)
-}
-
-#[inline]
-pub(crate) unsafe fn call3(nr: c_long, a1: usize, a2: usize, a3: usize) -> SysRes {
-    let ret;
-    asm!(
-        "syscall",
-        inlateout("rax") nr => ret,
-        in("rdi") a1,
-        in("rsi") a2,
-        in("rdx") a3,
-        lateout("rcx") _,
-        lateout("r11") _,
-        options(nostack, preserves_flags)
-    );
-    SysRes::new(ret)
-}
-
-#[inline]
-pub(crate) unsafe fn call3_rd(nr: c_long, a1: usize, a2: usize, a3: usize) -> SysRes {
-    let ret;
-    asm!(
-        "syscall",
-        inlateout("rax") nr => ret,
-        in("rdi") a1,
-        in("rsi") a2,
-        in("rdx") a3,
-        lateout("rcx") _,
-        lateout("r11") _,
-        options(nostack, preserves_flags, readonly)
-    );
-    SysRes::new(ret)
-}
-
-#[inline]
-pub(crate) unsafe fn call4(nr: c_long, a1: usize, a2: usize, a3: usize, a4: usize) -> SysRes {
-    let ret;
-    asm!(
-        "syscall",
-        inlateout("rax") nr => ret,
-        in("rdi") a1,
-        in("rsi") a2,
-        in("rdx") a3,
-        in("r10") a4,
-        lateout("rcx") _,
-        lateout("r11") _,
-        options(nostack, preserves_flags)
-    );
-    SysRes::new(ret)
-}
-
-#[inline]
-pub(crate) unsafe fn call4_rd(nr: c_long, a1: usize, a2: usize, a3: usize, a4: usize) -> SysRes {
-    let ret;
-    asm!(
-        "syscall",
-        inlateout("rax") nr => ret,
-        in("rdi") a1,
-        in("rsi") a2,
-        in("rdx") a3,
-        in("r10") a4,
-        lateout("rcx") _,
-        lateout("r11") _,
-        options(nostack, preserves_flags, readonly)
-    );
-    SysRes::new(ret)
-}
-
-#[inline]
-pub(crate) unsafe fn call5(
-    nr: c_long,
-    a1: usize,
-    a2: usize,
-    a3: usize,
-    a4: usize,
-    a5: usize,
-) -> SysRes {
-    let ret;
-    asm!(
-        "syscall",
-        inlateout("rax") nr => ret,
-        in("rdi") a1,
-        in("rsi") a2,
-        in("rdx") a3,
-        in("r10") a4,
-        in("r8") a5,
-        lateout("rcx") _,
-        lateout("r11") _,
-        options(nostack, preserves_flags)
-    );
-    SysRes::new(ret)
-}
-
-#[inline]
-pub(crate) unsafe fn call5_rd(
-    nr: c_long,
-    a1: usize,
-    a2: usize,
-    a3: usize,
-    a4: usize,
-    a5: usize,
-) -> SysRes {
-    let ret;
-    asm!(
-        "syscall",
-        inlateout("rax") nr => ret,
-        in("rdi") a1,
-        in("rsi") a2,
-        in("rdx") a3,
-        in("r10") a4,
-        in("r8") a5,
-        lateout("rcx") _,
-        lateout("r11") _,
-        options(nostack, preserves_flags, readonly)
-    );
-    SysRes::new(ret)
-}
-
-#[inline]
-pub(crate) unsafe fn call6(
-    nr: c_long,
-    a1: usize,
-    a2: usize,
-    a3: usize,
-    a4: usize,
-    a5: usize,
-    a6: usize,
-) -> SysRes {
-    let ret;
-    asm!(
-        "syscall",
-        inlateout("rax") nr => ret,
-        in("rdi") a1,
-        in("rsi") a2,
-        in("rdx") a3,
-        in("r10") a4,
-        in("r8") a5,
-        in("r9") a6,
-        lateout("rcx") _,
-        lateout("r11") _,
-        options(nostack, preserves_flags)
-    );
-    SysRes::new(ret)
-}
-
-#[inline]
-pub(crate) unsafe fn call6_rd(
-    nr: c_long,
-    a1: usize,
-    a2: usize,
-    a3: usize,
-    a4: usize,
-    a5: usize,
-    a6: usize,
-) -> SysRes {
-    let ret;
-    asm!(
-        "syscall",
-        inlateout("rax") nr => ret,
-        in("rdi") a1,
-        in("rsi") a2,
-        in("rdx") a3,
-        in("r10") a4,
-        in("r8") a5,
-        in("r9") a6,
-        lateout("rcx") _,
-        lateout("r11") _,
-        options(nostack, preserves_flags, readonly)
-    );
-    SysRes::new(ret)
-}
-
-// Roughly speaking, the code belonging to the system call with
-// number __NR_xxx defined in /usr/include/asm/unistd.h can be found
-// in the Linux kernel source in the routine sys_xxx().  There are
-// many exceptions, however, mostly because older system calls were
-// superseded by newer ones, and this has been treated somewhat
-// unsystematically.
-//
-// - `syscalls(2)`
 
 // arch/x86/entry/syscalls/syscall_64.tbl
 
@@ -334,3 +66,105 @@ pub const sys_memfd_create: c_long = 319;
 pub const sys_preadv2: c_long = 327;
 pub const sys_pwritev2: c_long = 328;
 pub const sys_clone3: c_long = 435;
+
+// syscall arguments use register-sized types
+// syscall return values use register-sized types
+//
+// `man syscall(2)`
+//
+// # Architecture Calling Convention
+//
+// Registers used to pass the system call arguments.
+//
+// Arch/ABI      arg1  arg2  arg3  arg4  arg5  arg6  arg7  Notes
+// ──────────────────────────────────────────────────────────────
+// x86-64        rdi   rsi   rdx   r10   r8    r9    -
+//
+// # ASM
+//
+// "rax" contains syscall nr as input, then syscall returns the value back to it
+//
+// More on Rust inline assembly: https://doc.rust-lang.org/reference/inline-assembly.html
+
+#[inline]
+pub(crate) unsafe fn call1_noret(nr: c_long, a1: usize) -> ! {
+    // [ud2]: <https://doc.rust-lang.org/reference/inline-assembly.html#r-asm.options.supported-options.noreturn>
+    asm!(
+        "syscall",
+        "ud2",
+        in("rax") nr,
+        in("rdi") a1,
+        options(nostack, noreturn)
+    )
+}
+
+/// Perform a syscall.
+///
+/// This is simple, function like macro, where the 1st argument is the syscall identifier, and the
+/// rest is the syscall arguments.
+macro_rules! call {
+    ($nr:ident
+     $(, $a1:expr
+     $(, $a2:expr
+     $(, $a3:expr
+     $(, $a4:expr
+     $(, $a5:expr
+     $(, $a6:expr
+     )?)?)?)?)?)?
+    ) => { unsafe {
+        let ret;
+        core::arch::asm!(
+            "syscall",
+            inlateout("rax") crate::sys::$nr => ret,
+            $(in("rdi") $a1,
+            $(in("rsi") $a2,
+            $(in("rdx") $a3,
+            $(in("r10") $a4,
+            $(in("r8") $a5,
+            $(in("r9") $a6,
+            )?)?)?)?)?)?
+            lateout("rcx") _,
+            lateout("r11") _,
+            options(nostack, preserves_flags)
+        );
+        core::mem::transmute::<core::ffi::c_long, crate::sys::SysRes>(ret)
+    } };
+}
+
+/// Perform a readonly syscall.
+///
+/// This is simple, function like macro, where the 1st argument is the syscall identifier, and the
+/// rest is the syscall arguments.
+///
+/// In contrast with [`call!`], this syscall should not mutate userspace memory.
+macro_rules! call_rd {
+    ($nr:ident
+     $(, $a1:expr
+     $(, $a2:expr
+     $(, $a3:expr
+     $(, $a4:expr
+     $(, $a5:expr
+     $(, $a6:expr
+     )?)?)?)?)?)?
+    ) => { unsafe {
+        let ret;
+        core::arch::asm!(
+            "syscall",
+            inlateout("rax") crate::sys::$nr => ret,
+            $(in("rdi") $a1,
+            $(in("rsi") $a2,
+            $(in("rdx") $a3,
+            $(in("r10") $a4,
+            $(in("r8") $a5,
+            $(in("r9") $a6,
+            )?)?)?)?)?)?
+            lateout("rcx") _,
+            lateout("r11") _,
+            options(nostack, preserves_flags, readonly)
+        );
+        core::mem::transmute::<core::ffi::c_long, crate::sys::SysRes>(ret)
+    } };
+}
+
+pub(crate) use call;
+pub(crate) use call_rd;

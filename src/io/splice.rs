@@ -12,7 +12,8 @@ pub fn sendfile<O: AsFd + ?Sized, I: AsFd + ?Sized>(
     offset: Option<&mut Off>,
     count: usize,
 ) -> Result<usize, SpliceError> {
-    sys::call!(sys_sendfile, out_fd.as_fd(), in_fd.as_fd(), offset, count).io2()
+    let offset = sys::optmut(offset);
+    sys::call!(sys_sendfile, out_fd.as_raw_fd(), in_fd.as_raw_fd(), offset, count).io2()
 }
 
 /// Splice data to/from a pipe (`splice(2)`).
@@ -25,7 +26,10 @@ pub fn splice<I: AsFd + ?Sized, O: AsFd + ?Sized>(
     size: usize,
     flags: SpliceFlags,
 ) -> Result<usize, SpliceError> {
-    sys::call!(sys_splice, fd_in.as_fd(), off_in, fd_out.as_fd(), off_out, size, flags.0).io2()
+    let off_in = sys::optmut(off_in);
+    let off_out = sys::optmut(off_out);
+    sys::call!(sys_splice, fd_in.as_raw_fd(), off_in, fd_out.as_raw_fd(), off_out, size, flags.0)
+        .io2()
 }
 
 /// Duplicate pipe content (`tee(2)`).
@@ -36,7 +40,7 @@ pub fn tee<I: AsFd + ?Sized, O: AsFd + ?Sized>(
     size: usize,
     flags: SpliceFlags,
 ) -> Result<usize, SpliceError> {
-    sys::call!(sys_tee, fd_in.as_fd(), fd_out.as_fd(), size, flags.0).io2()
+    sys::call!(sys_tee, fd_in.as_raw_fd(), fd_out.as_raw_fd(), size, flags.0).io2()
 }
 
 /// Splice user pages to/from a pipe (`vmsplice(2)`).
@@ -46,7 +50,7 @@ pub fn vmsplice<Fd: AsFd + ?Sized>(
     iov: &[IoVecMut<'_>],
     flags: SpliceFlags,
 ) -> Result<usize, SpliceError> {
-    sys::call!(sys_vmsplice, fd.as_fd(), iov, iov.len(), flags.0).io2()
+    sys::call!(sys_vmsplice, fd.as_raw_fd(), iov.as_ptr(), iov.len(), flags.0).io2()
 }
 
 // ===== flags =====

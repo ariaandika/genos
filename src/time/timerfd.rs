@@ -24,7 +24,7 @@ impl Timerfd {
     /// Arms (starts) or disarms (stops) the timer (`timerfd_settime(2)`).
     #[inline]
     pub fn set_time(&self, time: &ITimerspec, flags: TimerFlags) -> Result<()> {
-        sys::call_rd!(sys_timerfd_settime, self.as_fd(), flags.0, time, 0).e(Kind::Set)
+        sys::call_rd!(sys_timerfd_settime, self.as_raw_fd(), flags.0, time, 0).e(Kind::Set)
     }
 
     /// Returns the current timer (`timerfd_gettime(2)`).
@@ -56,7 +56,7 @@ impl Timerfd {
 }
 
 fn timerfd_gettime(fd: &Timerfd, time: *mut ITimerspec) -> impl SysResExt {
-    sys::call!(sys_timerfd_gettime, fd.as_fd(), time)
+    sys::call!(sys_timerfd_gettime, fd.as_raw_fd(), time)
 }
 
 // ===== Flags =====

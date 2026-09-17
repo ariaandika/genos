@@ -1,22 +1,31 @@
-pub(crate) use arch::*;
 pub(crate) use shared::*;
-pub(crate) use types::*;
+pub(crate) use arch::*;
 
-pub(crate) use macros::{call_rd, call};
+// constants, structs
+mod shared;
+
+pub(crate) fn optmut<T>(opt: Option<&mut T>) -> *mut T {
+    // this will generate to just a `mov`
+    opt.map_or(core::ptr::null_mut(), |e|e as *mut _)
+}
+
+/// Syscall result.
+///
+/// Wrapped to prevent missuse.
+#[must_use]
+pub(crate) struct SysRes(isize);
+
+impl SysRes {
+    /// Should only be extracted by helper api.
+    pub(crate) fn into_inner(self) -> isize {
+        self.0
+    }
+}
+
+// ===== architecture =====
 
 // default fallback for arch specific definitions
 mod asm_generic;
-
-// architecture independent definitions
-mod shared;
-
-// `IntoArg` and `SysRes`
-mod types;
-
-// syscall, ioctl, fcntl
-mod macros;
-
-// ===== architecture =====
 
 #[cfg_attr(target_arch = "x86_64", path = "x86_64.rs")]
 mod arch;

@@ -9,7 +9,7 @@ use crate::{error, sys};
 /// Read bytes from this fd into the buffer (`read(2)`).
 #[inline]
 pub fn read<Fd: AsFd + ?Sized>(fd: &Fd, buf: &mut [MaybeUninit<u8>]) -> Result<usize, ReadError> {
-    sys::call!(sys_read, fd.as_fd(), buf.as_mut_ptr(), buf.len()).io2::<ReadError>()
+    sys::call!(sys_read, fd.as_raw_fd(), buf.as_mut_ptr(), buf.len()).io2::<ReadError>()
 }
 
 /// Read bytes from this fd into the buffer at given offset (`pread(2)`).
@@ -19,13 +19,13 @@ pub fn pread<Fd: AsFd + ?Sized>(
     buf: &mut [MaybeUninit<u8>],
     offset: Off,
 ) -> Result<usize, ReadError> {
-    sys::call!(sys_pread64, fd.as_fd(), buf.as_mut_ptr(), buf.len(), offset).io2::<ReadError>()
+    sys::call!(sys_pread64, fd.as_raw_fd(), buf.as_mut_ptr(), buf.len(), offset).io2::<ReadError>()
 }
 
 /// Read bytes from this fd into given scattered buffer (`readv(2)`).
 #[inline]
 pub fn readv<Fd: AsFd + ?Sized>(fd: &Fd, buf: &[IoVecMut<'_>]) -> Result<usize, ReadError> {
-    sys::call!(sys_readv, fd.as_fd(), buf, buf.len()).io2::<ReadError>()
+    sys::call!(sys_readv, fd.as_raw_fd(), buf.as_ptr(), buf.len()).io2::<ReadError>()
 }
 
 /// Read bytes from this fd into given scattered buffer at given offset (`preadv2(2)`).
@@ -36,7 +36,8 @@ pub fn preadv<Fd: AsFd + ?Sized>(
     offset: Off,
     flags: RWFlags,
 ) -> Result<usize, ReadError> {
-    sys::call!(sys_preadv2, fd.as_fd(), buf, buf.len(), offset, i32::from(flags)).io2::<ReadError>()
+    sys::call!(sys_preadv2, fd.as_raw_fd(), buf.as_ptr(), buf.len(), offset, i32::from(flags))
+        .io2::<ReadError>()
 }
 
 // ===== Error =====

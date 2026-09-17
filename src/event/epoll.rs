@@ -48,13 +48,13 @@ impl Epoll {
     where
         Fd: AsFd + ?Sized,
     {
-        sys::call_rd!(sys_epoll_ctl, self.as_fd(), op, fd.as_fd(), ev).e(er)
+        sys::call_rd!(sys_epoll_ctl, self.as_raw_fd(), op, fd.as_raw_fd(), ev).e(er)
     }
 
     /// Waits for events `epoll_wait(2)`.
     #[inline]
     pub fn wait(&self, buf: &mut [MaybeUninit<Event>], timeout: i32) -> Result<usize> {
-        sys::call!(sys_epoll_wait, self.as_fd(), buf.as_mut_ptr(), buf.len(), timeout)
+        sys::call!(sys_epoll_wait, self.as_raw_fd(), buf.as_mut_ptr(), buf.len(), timeout)
             .io(Kind::Wait)
     }
 }

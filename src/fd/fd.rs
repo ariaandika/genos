@@ -82,6 +82,6 @@ impl OwnedFd {
 impl Drop for OwnedFd {
     #[inline]
     fn drop(&mut self) {
-        sys::call_rd!(sys_close, self.0);
+        let _ = sys::call_rd!(sys_close, self.0);
     }
 }

@@ -1,5 +1,3 @@
-use core::ffi::CStr;
-
 use crate::error::{ErrCode, SysResExt};
 use crate::ffi::{Char, Pid};
 use crate::signal::Signo;
@@ -25,7 +23,7 @@ pub fn fork() -> Result<Pid, ForkError> {
 
 /// Executes the program referred to by path (`execve(2)`).
 #[inline]
-pub fn execve(path: &CStr, argv: &Option<&Char>, envp: &Option<&Char>) -> ErrCode {
+pub fn execve(path: &Char, argv: &Option<&Char>, envp: &Option<&Char>) -> ErrCode {
     ErrCode::sys(sys::call_rd!(sys_execve, path, argv, envp).into_inner() as _)
 }
 

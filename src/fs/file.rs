@@ -29,7 +29,7 @@ impl File {
     /// Reposition read/write offset (`lseek(2)`).
     #[inline]
     pub fn seek(&self, offset: Off, seek: Seek) -> Result<Off> {
-        sys::call_rd!(sys_lseek, self.as_fd(), offset, seek.0)
+        sys::call_rd!(sys_lseek, self.as_raw_fd(), offset, seek.0)
             .io(Kind::Seek)
             .map(|e| e as _)
     }
@@ -37,7 +37,7 @@ impl File {
     /// Truncate file to a size of precisely length bytes (`ftruncate(2)`).
     #[inline]
     pub fn truncate(&self, length: Off) -> Result<()> {
-        sys::call_rd!(sys_ftruncate, self.as_fd(), length).e(Kind::Truncate)
+        sys::call_rd!(sys_ftruncate, self.as_raw_fd(), length).e(Kind::Truncate)
     }
 }
 
