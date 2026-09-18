@@ -2,10 +2,10 @@ use core::ffi::{self, CStr};
 
 /// Wrapper type around [`c_char`].
 ///
-/// This is intended to be used as a shared reference, `&Char`, to represent thin pointer over null
-/// terminated string.
+/// The type `&Char` is guaranteed to be null terminated.
 ///
-/// This can be used to store C string in a contiguous memory, avoiding pointer type.
+/// In contrast with [`CStr`], this has `#[repr(transparent)]` over [`c_char`], thus `&Char` have
+/// the same representation as C string `const char*`.
 ///
 /// [`c_char`]: ffi::c_char
 #[repr(transparent)]
@@ -30,6 +30,8 @@ impl Char {
         unsafe { CStr::from_ptr(self.as_ptr()) }
     }
 }
+
+// utility function like `strlen` and `strcmp` may not be added
 
 impl<'a> From<&'a CStr> for &'a Char {
     #[inline]
