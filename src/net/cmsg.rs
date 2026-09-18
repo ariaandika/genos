@@ -2,7 +2,7 @@
 use core::{ffi, marker, mem};
 
 use crate::net::msg::{AncillaryData, sealed};
-use crate::sys;
+use crate::net::raw;
 
 // ===== CMsgKind =====
 
@@ -23,7 +23,7 @@ pub struct CMsgType(i32);
 
 impl CMsgType {
     /// Send or receive a set of open file descriptors from another process.
-    pub const RIGHTS: Self = Self(sys::SCM_RIGHTS);
+    pub const RIGHTS: Self = Self(raw::SCM_RIGHTS);
 }
 
 impl From<CMsgType> for i32 {
@@ -55,7 +55,7 @@ impl From<CMsgType> for i32 {
 #[derive(Debug)]
 #[repr(C)]
 pub struct CMsgArray<T: CMsgKind + ?Sized, const N: usize> {
-    hdr: sys::cmsghdr,
+    hdr: raw::cmsghdr,
     data: [mem::MaybeUninit<T::Data>; N],
     _kind: marker::PhantomData<fn() -> T>,
 }
@@ -77,10 +77,10 @@ impl<T: CMsgKind + ?Sized, const N: usize> CMsgArray<T, N> {
     }
 
     const fn new_inner(data: [mem::MaybeUninit<T::Data>; N], data_len: usize) -> Self {
-        const { assert!(sys::CMSG_SPACE(size_of::<[T::Data; N]>()) == size_of::<Self>()) };
-        let hdr = sys::cmsghdr {
-            cmsg_len: sys::CMSG_LEN(data_len),
-            cmsg_level: sys::SOL_SOCKET,
+        const { assert!(raw::cmsg_space(size_of::<[T::Data; N]>()) == size_of::<Self>()) };
+        let hdr = raw::cmsghdr {
+            cmsg_len: raw::cmsg_len(data_len),
+            cmsg_level: raw::SOL_SOCKET,
             cmsg_type: T::TYPE.0,
         };
         Self { hdr, data, _kind: marker::PhantomData }
@@ -89,7 +89,7 @@ impl<T: CMsgKind + ?Sized, const N: usize> CMsgArray<T, N> {
     /// Returns length of the initialized data.
     #[inline]
     pub const fn len(&self) -> usize {
-        self.hdr.data_len() / size_of::<T::Data>()
+        (self.hdr.cmsg_len - raw::cmsg_align(size_of::<raw::cmsghdr>())) / size_of::<T::Data>()
     }
 
     /// Returns the initialized data as slice.

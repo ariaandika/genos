@@ -6,6 +6,7 @@ use crate::error::{ErrCode, SysResExt};
 use crate::fd::{AsFd, OwnedFd};
 use crate::net::addr::{AddrError, Family, SockAddr};
 use crate::net::msg::{MsgHdr, MsgHdrMut};
+use crate::net::raw::{self, Socklen};
 use crate::{error, fd, flags, sys};
 
 // ===== Socket =====
@@ -17,7 +18,7 @@ pub struct Socket(OwnedFd);
 fd::impl_fd_simple!(Socket);
 
 impl Socket {
-    /// Creates new [`Socket`].
+    /// Creates new [`Socket`] (`socket(2)`).
     #[inline]
     pub fn create(domain: Family, ty: Type, flags: Flags) -> Result<Self> {
         sys::call_rd!(sys_socket, i32::from(domain), ty.0 | flags.0, 0).fd(Kind::Create)
@@ -31,88 +32,71 @@ impl Socket {
         Self::create(Family::UNIX, Type::STREAM, flags)
     }
 
-    /// Bind address to this socket.
+    /// Bind address to this socket (`bind(2)`).
     #[inline]
-    pub fn bind<A: SockAddr>(&self, addr: &A) -> Result<()> {
-        let len = size_of::<A>() as sys::socklen_t;
-        sys::call_rd!(sys_bind, self.as_raw_fd(), addr, len).e(Kind::Bind)
+    pub fn bind(&self, addr: &SockAddr, addrlen: Socklen) -> Result<()> {
+        sys::call_rd!(sys_bind, self.as_raw_fd(), addr, addrlen).e(Kind::Bind)
     }
 
-    /// Initiate a connection on this socket.
+    /// Initiate a connection on this socket (`connect(2)`).
     #[inline]
-    pub fn connect<A: SockAddr>(&self, addr: &A) -> Result<()> {
-        let len = size_of::<A>() as sys::socklen_t;
-        sys::call_rd!(sys_connect, self.as_raw_fd(), addr, len).e(Kind::Connect)
+    pub fn connect(&self, addr: &SockAddr, addrlen: Socklen) -> Result<()> {
+        sys::call_rd!(sys_connect, self.as_raw_fd(), addr, addrlen).e(Kind::Connect)
     }
 
-    /// Returns this socket address.
+    /// Returns this socket address (`getsockname(2)`).
     #[inline]
-    pub fn addr<A: SockAddr>(&self) -> Result<A> {
-        let (mut addr, mut len) = (A::zeroed(), A::socklen_t());
-        sys::call!(sys_getsockname, self.as_raw_fd(), &mut addr, &mut len).e(Kind::GetAddr)?;
-        Self::validate_addr(addr, len)
+    pub fn addr(&self, addr: &mut SockAddr, addrlen: &mut Socklen) -> Result<()> {
+        sys::call!(sys_getsockname, self.as_raw_fd(), addr, addrlen).e(Kind::GetAddr)
     }
 
-    /// Returns the peer socket address.
+    /// Returns the peer socket address (`getpeername(2)`).
     #[inline]
-    pub fn peer_addr<A: SockAddr>(&self) -> Result<A> {
-        let (mut addr, mut len) = (A::zeroed(), A::socklen_t());
-        sys::call!(sys_getpeername, self.as_raw_fd(), &mut addr, &mut len).e(Kind::GetAddr)?;
-        Self::validate_addr(addr, len)
+    pub fn peer_addr(&self, addr: &mut SockAddr, addrlen: &mut Socklen) -> Result<()> {
+        sys::call!(sys_getpeername, self.as_raw_fd(), addr, addrlen).e(Kind::GetAddr)
     }
 
+    /// Listen for connections on this socket (`listen(2)`).
     #[inline]
-    fn validate_addr<A: SockAddr>(addr: A, len: sys::socklen_t) -> Result<A> {
-        if addr.sa_family() != A::FAMILY.sa_family() {
-            return Err(AddrError::MissmatchFamily.into());
-        }
-        if len > A::socklen_t() {
-            return Err(AddrError::MissmatchFamily.into());
-        }
-        Ok(addr)
+    pub fn listen(&self, backlog: i32) -> Result<()> {
+        sys::call_rd!(sys_listen, self.as_raw_fd(), backlog).e(Kind::Listen)
     }
 
-    /// Listen for connections on this socket.
+    /// Shut down part of a full-duplex connection (`shutdown(2)`).
     #[inline]
-    pub fn listen(&self) -> Result<()> {
-        sys::call_rd!(sys_listen, self.as_raw_fd(), -1).e(Kind::Listen)
-    }
-
-    /// Shut down part of a full-duplex connection.
-    #[inline]
-    pub fn shutdown(&self) -> Result<()> {
-        sys::call_rd!(sys_shutdown, self.as_raw_fd(), -1).e(Kind::Shutdown)
+    pub fn shutdown(&self, how: Shutdown) -> Result<()> {
+        sys::call_rd!(sys_shutdown, self.as_raw_fd(), how.0).e(Kind::Shutdown)
     }
 }
 
 impl Socket {
-    /// Send message on this fd.
+    /// Send message on this fd (`sendto(2)`).
     #[inline]
     pub fn send(&self, buf: &[u8], flags: SendFlags) -> Result<usize> {
         sys::call_rd!(sys_sendto, self.as_raw_fd(), buf.as_ptr(), buf.len(), flags.0, 0, 0)
             .io(Kind::Write)
     }
 
-    /// Send message on this fd.
+    /// Send message on this fd (`sendmsg(2)`).
     #[inline]
     pub fn sendmsg(&self, msg: &MsgHdr, flags: SendFlags) -> Result<usize> {
         sys::call_rd!(sys_sendmsg, self.as_raw_fd(), msg, flags.0).io(Kind::Write)
     }
 
-    /// Receive message from this fd.
+    /// Receive message from this fd (`recvfrom(2)`).
     #[inline]
     pub fn recv(&self, buf: &mut [MaybeUninit<u8>], flags: RecvFlags) -> Result<usize> {
         sys::call!(sys_recvfrom, self.as_raw_fd(), buf.as_mut_ptr(), buf.len(), flags.0, 0, 0)
             .io(Kind::Read)
     }
 
-    /// Receive message from this fd.
+    /// Receive message from this fd (`recvmsg(2)`).
     #[inline]
     pub fn recvmsg(&self, msg: &mut MsgHdrMut, flags: RecvFlags) -> Result<usize> {
         sys::call!(sys_recvmsg, self.as_raw_fd(), msg, flags.0).io(Kind::Read)
     }
 
-    /// Accept a connection on this socket.
+    /// Accept a connection on this socket (`accept4(2)`).
     #[inline]
     pub fn accept(&self, flags: Flags) -> Result<Self> {
         sys::call_rd!(sys_accept4, self.as_raw_fd(), 0, 0, flags.0).fd(Kind::Accept)
@@ -127,12 +111,12 @@ impl Socket {
 pub struct Type(i32);
 
 impl Type {
-    /// Provides sequenced, reliable, two-way, connection-based byte streams.
-    pub const STREAM: Self = Self(sys::SOCK_STREAM);
-    /// Supports datagrams (connectionless, unreliable messages of a fixed maximum length).
-    pub const DGRAM: Self = Self(sys::SOCK_DGRAM);
-    /// Provides raw network protocol access.
-    pub const RAW: Self = Self(sys::SOCK_RAW);
+    /// `SOCK_STREAM`
+    pub const STREAM: Self = Self(raw::SOCK_STREAM);
+    /// `SOCK_DGRAM`
+    pub const DGRAM: Self = Self(raw::SOCK_DGRAM);
+    /// `SOCK_RAW`
+    pub const RAW: Self = Self(raw::SOCK_RAW);
 }
 
 // ===== Flags =====
@@ -142,19 +126,14 @@ impl Type {
 #[repr(transparent)]
 pub struct Flags(i32);
 
-impl Flags {
-    /// Set the close-on-exec (FD_CLOEXEC) flag on the new fd.
-    pub const CLOEXEC: Self = Self(sys::SOCK_CLOEXEC);
-    /// Set the `O_NONBLOCK` file status flag on the new fd.
-    pub const NONBLOCK: Self = Self(sys::SOCK_NONBLOCK);
-}
-
-impl flags::OpenFlag for Flags {
-    const CLOEXEC: Self = Self::CLOEXEC;
-    const NONBLOCK: Self = Self::NONBLOCK;
-}
-
 flags::impl_bitops_simple!(Flags);
+
+impl Flags {
+    /// `SOCK_CLOEXEC`
+    pub const CLOEXEC: Self = Self(raw::SOCK_CLOEXEC);
+    /// `SOCK_NONBLOCK`
+    pub const NONBLOCK: Self = Self(raw::SOCK_NONBLOCK);
+}
 
 // ===== SendFlags =====
 
@@ -163,13 +142,12 @@ flags::impl_bitops_simple!(Flags);
 #[repr(transparent)]
 pub struct SendFlags(i32);
 
-impl SendFlags {
-    /// Enables nonblocking operation; if the operation would block, the call fails with EAGAIN or
-    /// EWOULDBLOCK.
-    pub const DONTWAIT: Self = Self(sys::MSG_DONTWAIT);
-}
-
 flags::impl_bitops_simple!(SendFlags);
+
+impl SendFlags {
+    /// `MSG_DONTWAIT`
+    pub const DONTWAIT: Self = Self(raw::MSG_DONTWAIT);
+}
 
 // ===== RecvFlags =====
 
@@ -178,18 +156,16 @@ flags::impl_bitops_simple!(SendFlags);
 #[repr(transparent)]
 pub struct RecvFlags(i32);
 
-impl RecvFlags {
-    /// Set the close-on-exec flag for the fd received via a UNIX domain fd using the `SCM_RIGHTS`
-    /// operation.
-    pub const CMSG_CLOEXEC: Self = Self(sys::MSG_CMSG_CLOEXEC);
-    /// Enables nonblocking operation; if the operation would block, the call fails with EAGAIN or
-    /// EWOULDBLOCK.
-    pub const DONTWAIT: Self = Self(sys::MSG_DONTWAIT);
-    /// Receive message without removing that data from the queue.
-    pub const PEEK: Self = Self(sys::MSG_PEEK);
-}
-
 flags::impl_bitops_simple!(RecvFlags);
+
+impl RecvFlags {
+    /// `MSG_CMSG_CLOEXEC`
+    pub const CMSG_CLOEXEC: Self = Self(raw::MSG_CMSG_CLOEXEC);
+    /// `MSG_DONTWAIT`
+    pub const DONTWAIT: Self = Self(raw::MSG_DONTWAIT);
+    /// `MSG_PEEK`
+    pub const PEEK: Self = Self(raw::MSG_PEEK);
+}
 
 // ===== ShutdownFlags =====
 
@@ -199,12 +175,12 @@ flags::impl_bitops_simple!(RecvFlags);
 pub struct Shutdown(i32);
 
 impl Shutdown {
-    /// Disable further receptions.
-    pub const READ: Self = Self(sys::SHUT_RD);
-    /// Disable further transmission.
-    pub const WRITE: Self = Self(sys::SHUT_WR);
-    /// Disable further receptions and transmission.
-    pub const BOTH: Self = Self(sys::SHUT_RDWR);
+    /// `SHUT_RD`
+    pub const READ: Self = Self(raw::SHUT_RD);
+    /// `SHUT_WR`
+    pub const WRITE: Self = Self(raw::SHUT_WR);
+    /// `SHUT_RDWR`
+    pub const BOTH: Self = Self(raw::SHUT_RDWR);
 }
 
 // ===== Error =====

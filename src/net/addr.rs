@@ -1,38 +1,18 @@
 //! Socket address.
-use core::{error, fmt};
+use core::{error, ffi, fmt};
 
-use crate::sys;
+use crate::net::{SaFamily, raw};
 
 // ===== SockAddr =====
 
-/// Socket family specific address.
-pub trait SockAddr: sealed::Sealed {
-    /// The socket address family.
-    const FAMILY: Family;
-}
-
-pub(super) mod sealed {
-    use crate::sys;
-
-    /// Implementor must guarantee:
-    ///
-    /// - the struct layout is a superset of [`sys::sockaddr`].
-    /// - the struct layout is valid for all zero bits
-    pub trait Sealed: Sized {
-        fn sa_family(&self) -> sys::sa_family_t {
-            // SAFETY: guarantee by the implementor
-            unsafe { &*(self as *const Self as *const sys::sockaddr) }.sa_family
-        }
-
-        fn zeroed() -> Self {
-            // SAFETY: guarantee by the implementor
-            unsafe { core::mem::zeroed() }
-        }
-
-        fn socklen_t() -> sys::socklen_t {
-            size_of::<Self>() as _
-        }
-    }
+/// `sockaddr(3type)`
+#[derive(Debug)]
+#[repr(C)]
+pub struct SockAddr {
+    /// `sockaddr.sa_family`
+    pub sa_family: SaFamily,
+    /// `sockaddr.sa_data`
+    pub sa_data: [ffi::c_char; 14],
 }
 
 // ===== Family =====
@@ -45,20 +25,16 @@ pub(super) mod sealed {
 pub struct Family(i32);
 
 impl Family {
-    /// Local communication.
-    ///
-    /// See `unix(7)`.
-    pub const UNIX: Self = Self(sys::AF_UNIX);
-    /// Synonym for [`Family::LOCAL`].
-    pub const LOCAL: Self = Self(sys::AF_LOCAL);
-    /// IPv4 Internet protocols.
-    ///
-    /// See `ip(7)`.
-    pub const INET: Self = Self(sys::AF_INET);
+    /// `AF_UNIX`
+    pub const UNIX: Self = Self(raw::AF_UNIX);
+    /// `AF_LOCAL`
+    pub const LOCAL: Self = Self(raw::AF_LOCAL);
+    /// `AF_INET`
+    pub const INET: Self = Self(raw::AF_INET);
 }
 
 impl Family {
-    pub(super) const fn sa_family(self) -> sys::sa_family_t {
+    pub(super) const fn sa_family(self) -> SaFamily {
         self.0 as _
     }
 }

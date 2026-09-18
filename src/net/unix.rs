@@ -1,10 +1,10 @@
 //! UNIX socket address.
-use core::ffi::CStr;
 use core::{ffi, fmt, marker, mem};
 
-use crate::net::addr::{AddrError, Family, SockAddr, sealed};
+use crate::ffi::Char;
+use crate::net::addr::{AddrError, Family, SockAddr};
 use crate::net::cmsg::{CMsgKind, CMsgType};
-use crate::sys;
+use crate::net::{SaFamily, raw};
 
 // ===== SockaddrUn =====
 
@@ -13,8 +13,8 @@ use crate::sys;
 /// See `sockaddr_un(3type)`.
 #[repr(C)]
 pub struct SockAddrUn {
-    sun_family: sys::sa_family_t,
-    sun_path: [ffi::c_char; sys::UNIX_PATH_MAX],
+    sun_family: SaFamily,
+    sun_path: [ffi::c_char; raw::UNIX_PATH_MAX],
 }
 
 impl SockAddrUn {
@@ -25,39 +25,46 @@ impl SockAddrUn {
     /// Returns error if path is too long. UNIX domain address path musst be less than 108 including
     /// the null termination byte.
     #[inline]
-    pub const fn from_path(path: &CStr) -> Result<Self, AddrError> {
+    pub const fn from_path(path: &Char) -> Result<Self, AddrError> {
         let mut addr = unsafe { mem::zeroed::<Self>() };
         addr.sun_family = Family::UNIX.sa_family();
 
-        if path.count_bytes() > const { sys::UNIX_PATH_MAX - 1 } {
+        if strlen(path) > const { raw::UNIX_PATH_MAX - 1 } {
             return Err(AddrError::ExcessivePath);
         }
 
         unsafe {
             addr.sun_path
                 .as_mut_ptr()
-                .copy_from_nonoverlapping(path.as_ptr(), sys::UNIX_PATH_MAX);
+                .copy_from_nonoverlapping(path.as_ptr(), raw::UNIX_PATH_MAX);
         };
         Ok(addr)
     }
 
+    /// Cast to generic [`SockAddr`]
+    #[inline]
+    pub const fn as_sockaddr(&self) -> &SockAddr {
+        // SAFETY: SockAddr is a subset of SockAddrUn
+        unsafe { &*(self as *const Self as *const SockAddr) }
+    }
+
     /// Returns the address as pathname.
     ///
-    /// Returns [`None`] if the addres is unnamed or abstract.
+    /// Returns [`None`] if the address is unnamed or abstract.
     #[inline]
-    pub fn as_pathname(&self) -> Option<&CStr> {
+    pub fn as_pathname(&self) -> Option<&Char> {
         if self.sun_path[0] == 0 {
             return None;
         }
         // SAFETY: `sun_path` guarantee to be null terminated
-        unsafe { Some(CStr::from_ptr(self.sun_path.as_ptr().cast())) }
+        unsafe { Some(&*self.sun_path.as_ptr().cast()) }
     }
 
     /// Returns the address as abstract address.
     ///
     /// Returns [`None`] if the addres is unnamed or pathname.
     #[inline]
-    pub fn as_abstract(&self) -> Option<&CStr> {
+    pub fn as_abstract(&self) -> Option<&Char> {
         if self.sun_path[0] != 0 {
             // pathname
             return None;
@@ -66,24 +73,16 @@ impl SockAddrUn {
             // unnamed
             return None;
         }
-        let addr = &self.sun_path[1..6];
-        unsafe { Some(CStr::from_bytes_with_nul_unchecked(mem::transmute::<&[i8], &[u8]>(addr))) }
+        unsafe { Some(&*self.sun_path.as_ptr().add(2).cast()) }
     }
 }
 
 // ===== trait impls =====
 
-impl SockAddr for SockAddrUn {
-    const FAMILY: Family = Family::UNIX;
-}
-
-impl sealed::Sealed for SockAddrUn {}
-
 impl fmt::Debug for SockAddrUn {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_tuple("SockAddrUn")
-            .field(&self.as_pathname().unwrap_or(c"<abstract>"))
-            .finish()
+        let path = self.as_pathname().unwrap_or_else(|| Char::new(c".."));
+        f.debug_tuple("SockAddrUn").field(&path).finish()
     }
 }
 
@@ -95,11 +94,19 @@ pub struct SCMRights(marker::PhantomData<()>);
 
 impl SCMRights {
     /// Maximum number of file descriptors that can be in the control message buffer.
-    pub const MAX_FD: i32 = sys::SCM_MAX_FD;
+    pub const MAX_FD: i32 = raw::SCM_MAX_FD;
 }
 
 impl CMsgKind for SCMRights {
     type Data = i32;
 
     const TYPE: CMsgType = CMsgType::RIGHTS;
+}
+
+const fn strlen(str: &Char) -> usize {
+    let mut n = 0;
+    while unsafe { *str.as_ptr().add(n) != 0 } {
+        n += 1;
+    }
+    n
 }

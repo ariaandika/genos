@@ -2,7 +2,7 @@
 use core::{ffi, fmt, marker};
 
 use crate::io::{IoVec, IoVecMut};
-use crate::sys;
+use crate::net::raw;
 
 // ===== AncillaryData =====
 
@@ -29,7 +29,7 @@ pub(super) mod sealed {
 /// See `sendmsg(2)`.
 #[repr(C)]
 pub struct MsgHdr<'io, 'ct> {
-    hdr: sys::msghdr,
+    hdr: raw::msghdr,
     _p: marker::PhantomData<&'io [IoVec<'io>]>,
     _q: marker::PhantomData<&'ct ()>,
 }
@@ -39,7 +39,7 @@ impl<'io> MsgHdr<'io, 'static> {
     #[inline]
     pub const fn new(iov: &'io [IoVec<'io>]) -> Self {
         Self {
-            hdr: sys::msghdr {
+            hdr: raw::msghdr {
                 msg_name: 0 as _,
                 msg_namelen: 0,
                 msg_iov: iov.as_ptr().cast_mut().cast(),
@@ -59,7 +59,7 @@ impl<'io, 'ct> MsgHdr<'io, 'ct> {
     #[inline]
     pub fn with_cmsg<C: AncillaryData>(iov: &'io [IoVec<'io>], cmsg: &'ct C) -> Self {
         Self {
-            hdr: sys::msghdr {
+            hdr: raw::msghdr {
                 msg_name: 0 as _,
                 msg_namelen: 0,
                 msg_iov: iov.as_ptr().cast_mut().cast(),
@@ -101,7 +101,7 @@ impl<'io, 'ct> fmt::Debug for MsgHdr<'io, 'ct> {
 /// See `recvmsg(2)`.
 #[repr(C)]
 pub struct MsgHdrMut<'io, 'ct> {
-    hdr: sys::msghdr,
+    hdr: raw::msghdr,
     _p: marker::PhantomData<&'io mut [IoVec<'io>]>,
     _q: marker::PhantomData<&'ct mut ()>,
 }
@@ -111,7 +111,7 @@ impl<'io> MsgHdrMut<'io, 'static> {
     #[inline]
     pub const fn new(iov: &'io mut [IoVecMut<'io>]) -> Self {
         Self {
-            hdr: sys::msghdr {
+            hdr: raw::msghdr {
                 msg_name: 0 as _,
                 msg_namelen: 0,
                 msg_iov: iov.as_mut_ptr().cast(),
@@ -131,7 +131,7 @@ impl<'io, 'ct> MsgHdrMut<'io, 'ct> {
     #[inline]
     pub fn with_cmsg<C: AncillaryData>(iov: &'io mut [IoVecMut<'io>], cmsg: &'ct mut C) -> Self {
         Self {
-            hdr: sys::msghdr {
+            hdr: raw::msghdr {
                 msg_name: 0 as _,
                 msg_namelen: 0,
                 msg_iov: iov.as_mut_ptr().cast(),
@@ -183,7 +183,7 @@ macro_rules! def {
         impl MsgFlags {$(
             $(#[$doc])*
             pub const fn $f(&self) -> bool {
-                self.0 & sys::$val != 0
+                self.0 & raw::$val != 0
             }
         )*}
     };

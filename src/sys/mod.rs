@@ -1,8 +1,4 @@
-pub(crate) use shared::*;
 pub(crate) use arch::*;
-
-// constants, structs
-mod shared;
 
 pub(crate) fn optmut<T>(opt: Option<&mut T>) -> *mut T {
     // this will generate to just a `mov`
@@ -23,9 +19,6 @@ impl SysRes {
 }
 
 // ===== architecture =====
-
-// default fallback for arch specific definitions
-mod asm_generic;
 
 #[cfg_attr(target_arch = "x86_64", path = "x86_64.rs")]
 mod arch;

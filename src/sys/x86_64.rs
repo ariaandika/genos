@@ -2,8 +2,6 @@
 use core::arch::asm;
 use core::ffi::c_long;
 
-pub use crate::sys::asm_generic::*;
-
 // arch/x86/entry/syscalls/syscall_64.tbl
 
 pub const sys_read: c_long = 0;
