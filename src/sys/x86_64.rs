@@ -87,6 +87,7 @@ defv2! {
     286 common  timerfd_settime     sys_timerfd_settime
     287 common  timerfd_gettime     sys_timerfd_gettime
     288 common  accept4             sys_accept4
+    290 common  eventfd2            sys_eventfd2
     291 common  epoll_create1       sys_epoll_create1
     318 common  getrandom           sys_getrandom
     319 common  memfd_create        sys_memfd_create
@@ -332,7 +333,6 @@ defv2! {
 // 284 common  eventfd         sys_eventfd
 // 285 common  fallocate       sys_fallocate
 // 289 common  signalfd4       sys_signalfd4
-// 290 common  eventfd2        sys_eventfd2
 // 292 common  dup3            sys_dup3
 // 293 common  pipe2           sys_pipe2
 // 294 common  inotify_init1       sys_inotify_init1

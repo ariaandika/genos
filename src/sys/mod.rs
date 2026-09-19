@@ -1,6 +1,8 @@
 //! System calls primitives.
-pub use sysres::{FromSysErr, SysErr, SysRaw, SysRes, SysResRaw};
 pub(crate) use arch::{call, call_rd};
+pub(crate) use sysres::SysResRaw;
+
+pub use sysres::{FromSysErr, SysErr, SysRaw, SysRes};
 
 mod sysres;
 

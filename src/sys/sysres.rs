@@ -67,13 +67,20 @@ pub trait FromSysErr<S: SysErr> {
 // ===== SysOk =====
 
 /// Systemcall number.
-pub(crate) trait SysOk {
+pub trait SysOk {
     fn from_raw(raw: SysRaw) -> Self;
 }
 
 impl SysOk for () {
     #[inline]
     fn from_raw(_: SysRaw) {}
+}
+
+impl SysOk for u64 {
+    #[inline]
+    fn from_raw(raw: SysRaw) -> Self {
+        raw as u64
+    }
 }
 
 impl SysOk for i64 {
@@ -126,6 +133,20 @@ pub struct SysResRaw<T, E> {
     raw: SysRaw,
     _t: PhantomData<T>,
     _e: PhantomData<fn() -> E>,
+}
+
+impl<T, E> SysResRaw<T, E> {
+    pub(crate) fn drop(self) -> SysResRaw<(), E> {
+        SysResRaw { raw: self.raw, _t: PhantomData, _e: PhantomData }
+    }
+
+    pub(crate) fn map<U: SysOk, F: FnOnce(SysRaw) -> SysRaw>(self, f: F) -> SysResRaw<U, E> {
+        SysResRaw {
+            raw: if self.raw >= 0 { f(self.raw) } else { self.raw },
+            _t: PhantomData,
+            _e: PhantomData,
+        }
+    }
 }
 
 impl<T: SysOk, E: SysErr> SysRes<T> for SysResRaw<T, E> {}

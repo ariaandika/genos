@@ -3,10 +3,18 @@ use crate::ffi::Off;
 use crate::io::{IoVec, RWFlags};
 use crate::sys::{self, SysRes};
 
+pub(crate) fn write_raw<T>(
+    fd: i32,
+    buf: *const T,
+    size: usize,
+) -> sys::SysResRaw<usize, sys::arch::sys_write> {
+    sys::call!(sys_write, fd, buf, size)
+}
+
 /// Writes bytes from the buffer to this fd (`write(2)`).
 #[inline]
 pub fn write<Fd: AsFd + ?Sized>(fd: &Fd, buf: &[u8]) -> impl SysRes<usize> {
-    sys::call_rd!(sys_write, fd.as_raw_fd(), buf.as_ptr(), buf.len())
+    write_raw(fd.as_raw_fd(), buf.as_ptr(), buf.len())
 }
 
 /// Writes bytes from the buffer to this fd at given offset (`pwrite(2)`).

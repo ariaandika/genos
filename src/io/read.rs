@@ -5,10 +5,18 @@ use crate::ffi::Off;
 use crate::io::{IoVecMut, RWFlags};
 use crate::sys::{self, SysRes};
 
+pub(crate) fn read_raw<T>(
+    fd: i32,
+    buf: *mut T,
+    size: usize,
+) -> sys::SysResRaw<usize, sys::arch::sys_read> {
+    sys::call!(sys_read, fd, buf, size)
+}
+
 /// Read bytes from this fd into the buffer (`read(2)`).
 #[inline]
 pub fn read<Fd: AsFd + ?Sized>(fd: &Fd, buf: &mut [MaybeUninit<u8>]) -> impl SysRes<usize> {
-    sys::call!(sys_read, fd.as_raw_fd(), buf.as_mut_ptr(), buf.len())
+    read_raw(fd.as_raw_fd(), buf.as_mut_ptr(), buf.len())
 }
 
 /// Read bytes from this fd into the buffer at given offset (`pread(2)`).
