@@ -11,6 +11,9 @@ pub type SysRaw = ffi::c_long;
 
 /// System call result.
 pub trait SysRes<T>: sealed::SealedRes<T> + Sized {
+    /// The syscall name.
+    const NAME: &str = <Self as sealed::SealedRes<T>>::INNER_NAME;
+
     /// Returns the raw syscall return value.
     #[inline]
     fn into_raw(self) -> SysRaw {
@@ -117,7 +120,7 @@ mod sealed {
     use super::SysRaw;
     pub trait SealedRes<T> {
         type Sysno: super::SysErr;
-        const NAME: &str;
+        const INNER_NAME: &str;
         fn raw(self) -> SysRaw;
         fn ok_from_raw(raw: SysRaw) -> T;
     }
@@ -152,7 +155,7 @@ impl<T, E> SysResRaw<T, E> {
 impl<T: SysOk, E: SysErr> SysRes<T> for SysResRaw<T, E> {}
 impl<T: SysOk, E: SysErr> sealed::SealedRes<T> for SysResRaw<T, E> {
     type Sysno = E;
-    const NAME: &str = E::NAME;
+    const INNER_NAME: &str = E::NAME;
 
     #[inline]
     fn raw(self) -> SysRaw {
