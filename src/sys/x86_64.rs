@@ -52,8 +52,8 @@ defv2! {
     40  common  sendfile            sys_sendfile64
     41  common  socket              sys_socket
     42  common  connect             sys_connect
-    45  64  recvfrom                sys_recvfrom
     44  common  sendto              sys_sendto
+    45  64  recvfrom                sys_recvfrom
     46  64  sendmsg                 sys_sendmsg
     47  64  recvmsg                 sys_recvmsg
     48  common  shutdown            sys_shutdown
@@ -84,11 +84,11 @@ defv2! {
     275 common  splice              sys_splice
     276 common  tee                 sys_tee
     278 64      vmsplice            sys_vmsplice
-    282 common  signalfd            sys_signalfd
     283 common  timerfd_create      sys_timerfd_create
     286 common  timerfd_settime     sys_timerfd_settime
     287 common  timerfd_gettime     sys_timerfd_gettime
     288 common  accept4             sys_accept4
+    289 common  signalfd4           sys_signalfd4
     290 common  eventfd2            sys_eventfd2
     291 common  epoll_create1       sys_epoll_create1
     318 common  getrandom           sys_getrandom
@@ -98,16 +98,18 @@ defv2! {
     435 common  clone3              sys_clone3
 }
 
+// superseded:
+// - poll, select, epoll_ctl_old, epoll_wait_old, epoll_create
+// - accept, signalfd, preadv, pwritev
+
 // 4   common  stat            sys_newstat
 // 5   common  fstat           sys_newfstat
 // 6   common  lstat           sys_newlstat
-// 7   common  poll            sys_poll
 // 13  64  rt_sigaction        sys_rt_sigaction
 // 15  64  rt_sigreturn        sys_rt_sigreturn
 // 16  64  ioctl           sys_ioctl
 // 21  common  access          sys_access
 // 22  common  pipe            sys_pipe
-// 23  common  select          sys_select
 // 24  common  sched_yield     sys_sched_yield
 // 25  common  mremap          sys_mremap
 // 26  common  msync           sys_msync
@@ -122,11 +124,9 @@ defv2! {
 // 36  common  getitimer       sys_getitimer
 // 37  common  alarm           sys_alarm
 // 38  common  setitimer       sys_setitimer
-// 43  common  accept          sys_accept
 // 53  common  socketpair      sys_socketpair
 // 54  64  setsockopt      sys_setsockopt
 // 55  64  getsockopt      sys_getsockopt
-// 56  common  clone           sys_clone
 // 58  common  vfork           sys_vfork
 // 61  common  wait4           sys_wait4
 // 63  common  uname           sys_newuname
@@ -270,9 +270,6 @@ defv2! {
 // 210 common  io_cancel       sys_io_cancel
 // 211 64  get_thread_area
 // 212 common  lookup_dcookie
-// 213 common  epoll_create        sys_epoll_create
-// 214 64  epoll_ctl_old
-// 215 64  epoll_wait_old
 // 216 common  remap_file_pages    sys_remap_file_pages
 // 217 common  getdents64      sys_getdents64
 // 218 common  set_tid_address     sys_set_tid_address
@@ -332,12 +329,9 @@ defv2! {
 // 281 common  epoll_pwait     sys_epoll_pwait
 // 284 common  eventfd         sys_eventfd
 // 285 common  fallocate       sys_fallocate
-// 289 common  signalfd4       sys_signalfd4
 // 292 common  dup3            sys_dup3
 // 293 common  pipe2           sys_pipe2
 // 294 common  inotify_init1       sys_inotify_init1
-// 295 64  preadv          sys_preadv
-// 296 64  pwritev         sys_pwritev
 // 297 64  rt_tgsigqueueinfo   sys_rt_tgsigqueueinfo
 // 298 common  perf_event_open     sys_perf_event_open
 // 299 64  recvmmsg        sys_recvmmsg

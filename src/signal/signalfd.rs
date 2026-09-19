@@ -37,8 +37,8 @@ impl Signalfd {
     }
 }
 
-fn signalfd<T>(fd: i32, sigset: &Sigset, flags: Flags) -> SysResRaw<T, arch::sys_signalfd> {
-    sys::call_rd!(sys_signalfd, fd, sigset.as_ref(), flags.0)
+fn signalfd<T>(fd: i32, sigset: &Sigset, flags: Flags) -> SysResRaw<T, arch::sys_signalfd4> {
+    sys::call_rd!(sys_signalfd4, fd, sigset.as_ref(), flags.0)
 }
 
 // ===== Siginfo =====
