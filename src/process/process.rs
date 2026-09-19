@@ -1,54 +1,40 @@
-use crate::error::{ErrCode, SysResExt};
+use crate::error::ErrCode;
 use crate::ffi::{Char, Pid};
 use crate::signal::Signo;
-use crate::{error, sys};
+use crate::sys::{self, SysRes, arch};
 
 /// Returns process ID (PID) of the calling process (`getpid(2)`).
 #[inline]
 pub fn getpid() -> Pid {
-    sys::call_rd!(sys_getpid).into_inner() as Pid
+    SysRes::<()>::into_raw(sys::call_rd!(sys_getpid)) as Pid
 }
 
 /// Returns process ID (PID) of the parent of the calling process (`getppid(2)`).
 #[inline]
 pub fn getppid() -> Pid {
-    sys::call_rd!(sys_getppid).into_inner() as Pid
+    SysRes::<()>::into_raw(sys::call_rd!(sys_getppid)) as Pid
 }
 
 /// Create child process by duplicating the calling process (`fork(2)`).
 #[inline]
-pub fn fork() -> Result<Pid, ForkError> {
-    sys::call_rd!(sys_fork).io2().map(|e| e as _)
+pub fn fork() -> impl SysRes<Pid> {
+    sys::call_rd!(sys_fork)
 }
 
 /// Executes the program referred to by path (`execve(2)`).
 #[inline]
 pub fn execve(path: &Char, argv: &Option<&Char>, envp: &Option<&Char>) -> ErrCode {
-    ErrCode::sys(sys::call_rd!(sys_execve, path, argv, envp).into_inner() as _)
+    ErrCode::sys(SysRes::<()>::into_raw(sys::call_rd!(sys_execve, path, argv, envp)) as _)
 }
 
 /// Send a signal to process this struct refers to (`kill(2)`).
 #[inline]
-pub fn kill(pid: Pid, sig: Signo) -> Result<(), KillError> {
-    sys::call_rd!(sys_kill, pid, i32::from(sig)).e2()
+pub fn kill(pid: Pid, sig: Signo) -> impl SysRes<()> {
+    sys::call_rd!(sys_kill, pid, i32::from(sig))
 }
 
 /// Terminate process with given status code (`exit(2)`).
 #[inline]
 pub fn exit(status: i32) -> ! {
-    unsafe { sys::call1_noret(sys::sys_exit, status as usize) }
+    unsafe { arch::call1_noret(arch::sys_exit::NO, status) }
 }
-
-// ===== errors =====
-
-/// An error that may occur during [`fork`] operation.
-#[derive(Clone, Copy)]
-pub struct ForkError(ErrCode);
-
-error::impl_error_os_simple!(ForkError, "fork process");
-
-/// An error that may occur during [`kill`] operation.
-#[derive(Clone, Copy)]
-pub struct KillError(ErrCode);
-
-error::impl_error_os_simple!(KillError, "send signal to process");

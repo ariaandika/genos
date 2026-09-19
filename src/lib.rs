@@ -32,7 +32,7 @@
 //! # Other
 //!
 //! - [`elf`], Executable and Linkable Format (ELF)
-//! - [`env`], Argument and Environment variables
+//! - [`mod@env`], Argument and Environment variables
 #![no_std]
 #![warn(
     // quality of API
@@ -51,7 +51,7 @@
 )]
 #![allow(clippy::module_inception, clippy::new_without_default, clippy::len_without_is_empty)]
 
-mod sys;
+pub mod sys;
 
 // ===== standards =====
 

@@ -1,7 +1,7 @@
 //! [`Memfd`] associated types.
-use crate::error::{self, ErrCode, SysResExt};
 use crate::fd::{self, OwnedFd};
 use crate::ffi::Char;
+use crate::sys::SysRes;
 use crate::{flags, sys};
 
 // ===== Memfd =====
@@ -15,8 +15,8 @@ fd::impl_fd_simple!(Memfd);
 impl Memfd {
     /// Creates new [`Memfd`] (`memfd_create(2)`).
     #[inline]
-    pub fn create(name: &Char, flags: Flags) -> Result<Self, Error> {
-        sys::call_rd!(sys_memfd_create, name, flags.0).fd2()
+    pub fn create(name: &Char, flags: Flags) -> impl SysRes<Self> {
+        sys::call_rd!(sys_memfd_create, name, flags.0)
     }
 }
 
@@ -41,14 +41,6 @@ impl Memfd {
     /// `MFD_EXEC`
     pub const EXEC: Flags = Flags(MFD_EXEC);
 }
-
-// ===== Error =====
-
-/// An error that may occur when creating [`Memfd`].
-#[derive(Copy, Clone)]
-pub struct Error(ErrCode);
-
-error::impl_error_os_simple!(Error, "create memfd");
 
 // ===== extern =====
 

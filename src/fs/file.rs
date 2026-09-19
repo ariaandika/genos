@@ -1,10 +1,8 @@
 //! [`File`] associated types.
-use core::{fmt, result};
-
-use crate::error::{ErrCode, SysResExt};
 use crate::fd::{AsFd, Open, OwnedFd};
 use crate::ffi::{Char, Mode, Off};
-use crate::{error, fd, sys};
+use crate::sys::SysRes;
+use crate::{fd, sys};
 
 /// Open file descriptor.
 #[derive(Debug)]
@@ -15,29 +13,27 @@ fd::impl_fd_simple!(File);
 impl File {
     /// Opens specified file (`open(2)`).
     #[inline]
-    pub fn open(path: &Char, mode: Open) -> Result<Self> {
-        sys::call_rd!(sys_open, path, mode.raw()).fd(Kind::Open)
+    pub fn open(path: &Char, mode: Open) -> impl SysRes<Self> {
+        sys::call_rd!(sys_open, path, mode.raw())
     }
 
     /// Create file if does not exists, open in write-only mode, and truncate to length 0
     /// (`creat(2)`).
     #[inline]
-    pub fn create(path: &Char, mode: Mode) -> Result<Self> {
-        sys::call_rd!(sys_creat, path, mode).fd(Kind::Create)
+    pub fn create(path: &Char, mode: Mode) -> impl SysRes<Self> {
+        sys::call_rd!(sys_creat, path, mode)
     }
 
     /// Reposition read/write offset (`lseek(2)`).
     #[inline]
-    pub fn seek(&self, offset: Off, seek: Seek) -> Result<Off> {
+    pub fn seek(&self, offset: Off, seek: Seek) -> impl SysRes<Off> {
         sys::call_rd!(sys_lseek, self.as_raw_fd(), offset, seek.0)
-            .io(Kind::Seek)
-            .map(|e| e as _)
     }
 
     /// Truncate file to a size of precisely length bytes (`ftruncate(2)`).
     #[inline]
-    pub fn truncate(&self, length: Off) -> Result<()> {
-        sys::call_rd!(sys_ftruncate, self.as_raw_fd(), length).e(Kind::Truncate)
+    pub fn truncate(&self, length: Off) -> impl SysRes<()> {
+        sys::call_rd!(sys_ftruncate, self.as_raw_fd(), length)
     }
 }
 
@@ -48,58 +44,17 @@ impl File {
 #[repr(transparent)]
 pub struct Seek(i32);
 
-impl Seek {
+impl File {
     /// `SEEK_SET`
-    pub const SET: Self = Self(SEEK_SET);
+    pub const SET: Seek = Seek(SEEK_SET);
     /// `SEEK_CUR`
-    pub const CUR: Self = Self(SEEK_CUR);
+    pub const CUR: Seek = Seek(SEEK_CUR);
     /// `SEEK_END`
-    pub const END: Self = Self(SEEK_END);
+    pub const END: Seek = Seek(SEEK_END);
     /// `SEEK_DATA`
-    pub const DATA: Self = Self(SEEK_DATA);
+    pub const DATA: Seek = Seek(SEEK_DATA);
     /// `SEEK_HOLE`
-    pub const HOLE: Self = Self(SEEK_HOLE);
-}
-
-// ===== Error =====
-
-/// Type alias for result of [`File`] operations.
-pub type Result<T> = result::Result<T, Error>;
-
-/// An error that may occur during any [`File`] operations.
-#[derive(Debug, Clone)]
-pub struct Error {
-    kind: Kind,
-    code: ErrCode,
-}
-
-#[derive(Debug, Clone)]
-pub(super) enum Kind {
-    Open,
-    Create,
-    Seek,
-    Rename,
-    Truncate,
-    Link,
-    Unlink,
-}
-
-error::impl_error_with_kind!(Error, Kind);
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { kind, code } = self;
-        let msg = match kind {
-            Kind::Open => "open",
-            Kind::Create => "create",
-            Kind::Seek => "seek",
-            Kind::Rename => "rename",
-            Kind::Truncate => "truncate",
-            Kind::Link => "link",
-            Kind::Unlink => "unlink",
-        };
-        write!(f, "failed to {msg} file: {code}")
-    }
+    pub const HOLE: Seek = Seek(SEEK_HOLE);
 }
 
 // ===== extern =====

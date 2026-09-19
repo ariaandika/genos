@@ -1,43 +1,29 @@
-#![expect(non_camel_case_types)]
 use core::ffi::{c_int, c_long, c_uint};
 
-// include/uapi/asm-generic/posix_types.h
+// time/bits/types/time_t.h
 
-type __kernel_long_t = c_long;
-type __kernel_mode_t = c_uint;
-type __kernel_pid_t = c_int;
-
-type __kernel_uid32_t = c_uint;
-type __kernel_gid32_t = c_uint;
-
-type __kernel_off_t = __kernel_long_t;
-type __kernel_time_t = __kernel_long_t;
-type __kernel_timer_t = c_int;
-type __kernel_clockid_t = c_int;
-
-// include/uapi/linux/types.h
-
-// __poll_t
+/// `time_t(3type)`
+pub type Time = c_long;
 
 // include/linux/types.h
 
 /// `mode_t(3type)`
-pub type Mode = __kernel_mode_t;
+pub type Mode = c_uint;
 
 /// `off_t(3type)`
-pub type Off = __kernel_off_t;
+pub type Off = c_long;
 
 /// `pid_t(3type)`
-pub type Pid = __kernel_pid_t;
+pub type Pid = c_int;
 
 /// `timer_t(3type)`
-pub type Timer = __kernel_timer_t;
+pub type Timer = c_int;
 
 /// `clockid_t(3type)`
-pub type ClockID = __kernel_clockid_t;
+pub type ClockID = c_int;
 
 /// `uid_t(3type)`
-pub type Uid = __kernel_uid32_t;
+pub type Uid = c_uint;
 
 /// `gid_t(3type)`
-pub type Gid = __kernel_gid32_t;
+pub type Gid = c_uint;

@@ -2,6 +2,7 @@ use core::fmt;
 
 use crate::fd::{AsFd, BorrowedFd};
 use crate::io;
+use crate::sys::SysRes;
 
 /// Standard input stream (`stdin(3)`).
 #[derive(Debug)]
@@ -27,10 +28,8 @@ macro_rules! impl_stream {
             impl $write for $me {
                 #[inline]
                 fn write_str(&mut self, s: &str) -> fmt::Result {
-                    match io::write(self, s.as_bytes()) {
-                        Ok(_) => Ok(()),
-                        Err(_) => Err(fmt::Error),
-                    }
+                    let res = io::write(self, s.as_bytes()).into_raw();
+                    if res >= 0 { Ok(()) } else { Err(fmt::Error) }
                 }
             }
         )?

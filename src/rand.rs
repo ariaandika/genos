@@ -1,13 +1,13 @@
 //! Random number generator.
 use core::mem::MaybeUninit;
 
-use crate::error::{ErrCode, SysResExt};
-use crate::{error, flags, sys};
+use crate::sys::SysRes;
+use crate::{flags, sys};
 
 /// Generate a random number to the given buffer (`getrandom(2)`).
 #[inline]
-pub fn getrandom(buf: &mut [MaybeUninit<u8>], flags: Flags) -> Result<usize, Error> {
-    sys::call!(sys_getrandom, buf.as_mut_ptr(), buf.len(), flags.0).io2()
+pub fn getrandom(buf: &mut [MaybeUninit<u8>], flags: Flags) -> impl SysRes<usize> {
+    sys::call!(sys_getrandom, buf.as_mut_ptr(), buf.len(), flags.0)
 }
 
 // ===== Flags =====
@@ -26,14 +26,6 @@ impl Flags {
     /// `GRND_INSECURE`
     pub const INSECURE: Self = Self(GRND_INSECURE);
 }
-
-// ===== Error =====
-
-/// An error that may occur during [`getrandom`] operation.
-#[derive(Clone, Copy)]
-pub struct Error(ErrCode);
-
-error::impl_error_os_simple!(Error, "generate random number");
 
 // ===== extern =====
 

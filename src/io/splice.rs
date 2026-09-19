@@ -1,8 +1,8 @@
-use crate::error::{ErrCode, SysResExt};
 use crate::fd::AsFd;
 use crate::ffi::Off;
 use crate::io::IoVecMut;
-use crate::{error, flags, sys};
+use crate::sys::SysRes;
+use crate::{flags, sys};
 
 /// Copies data between one file descriptor and another (`sendfile(2)`).
 #[inline]
@@ -11,9 +11,9 @@ pub fn sendfile<O: AsFd + ?Sized, I: AsFd + ?Sized>(
     in_fd: &I,
     offset: Option<&mut Off>,
     count: usize,
-) -> Result<usize, SpliceError> {
+) -> impl SysRes<usize> {
     let offset = sys::optmut(offset);
-    sys::call!(sys_sendfile, out_fd.as_raw_fd(), in_fd.as_raw_fd(), offset, count).io2()
+    sys::call!(sys_sendfile64, out_fd.as_raw_fd(), in_fd.as_raw_fd(), offset, count)
 }
 
 /// Splice data to/from a pipe (`splice(2)`).
@@ -25,32 +25,29 @@ pub fn splice<I: AsFd + ?Sized, O: AsFd + ?Sized>(
     off_out: Option<&mut Off>,
     size: usize,
     flags: SpliceFlags,
-) -> Result<usize, SpliceError> {
+) -> impl SysRes<usize> {
     let off_in = sys::optmut(off_in);
     let off_out = sys::optmut(off_out);
     sys::call!(sys_splice, fd_in.as_raw_fd(), off_in, fd_out.as_raw_fd(), off_out, size, flags.0)
-        .io2()
 }
 
 /// Duplicate pipe content (`tee(2)`).
 #[inline]
-pub fn tee<I: AsFd + ?Sized, O: AsFd + ?Sized>(
-    fd_in: &I,
-    fd_out: &O,
-    size: usize,
-    flags: SpliceFlags,
-) -> Result<usize, SpliceError> {
-    sys::call!(sys_tee, fd_in.as_raw_fd(), fd_out.as_raw_fd(), size, flags.0).io2()
+pub fn tee<I, O>(fd_in: &I, fd_out: &O, size: usize, flags: SpliceFlags) -> impl SysRes<usize>
+where
+    I: AsFd + ?Sized,
+    O: AsFd + ?Sized,
+{
+    sys::call_rd!(sys_tee, fd_in.as_raw_fd(), fd_out.as_raw_fd(), size, flags.0)
 }
 
 /// Splice user pages to/from a pipe (`vmsplice(2)`).
 #[inline]
-pub fn vmsplice<Fd: AsFd + ?Sized>(
-    fd: &Fd,
-    iov: &[IoVecMut<'_>],
-    flags: SpliceFlags,
-) -> Result<usize, SpliceError> {
-    sys::call!(sys_vmsplice, fd.as_raw_fd(), iov.as_ptr(), iov.len(), flags.0).io2()
+pub fn vmsplice<Fd>(fd: &Fd, iov: &[IoVecMut<'_>], flags: SpliceFlags) -> impl SysRes<usize>
+where
+    Fd: AsFd + ?Sized,
+{
+    sys::call!(sys_vmsplice, fd.as_raw_fd(), iov.as_ptr(), iov.len(), flags.0)
 }
 
 // ===== flags =====
@@ -74,11 +71,3 @@ impl SpliceFlags {
     /// `SPLICE_F_GIFT`
     pub const GIFT: Self = Self(0x08);
 }
-
-// ===== error =====
-
-/// An error that may occur when splicing buffer between fds.
-#[derive(Clone, Copy)]
-pub struct SpliceError(ErrCode);
-
-error::impl_error_os_simple!(SpliceError, "splice fds");

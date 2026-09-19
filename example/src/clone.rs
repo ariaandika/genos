@@ -1,5 +1,6 @@
 use genos::ffi::Char;
 use genos::process::{CloneArgs, clone, exit};
+use genos::sys::SysRes;
 
 use crate::println;
 

@@ -1,43 +1,61 @@
 //! [`mmap`] associated types.
 use core::ffi::c_void;
 use core::ptr::NonNull;
-use core::{fmt, result};
 
-use crate::error::{ErrCode, SysResExt};
 use crate::fd::AsFd;
 use crate::ffi::Off;
-use crate::{error, flags, sys};
+use crate::sys::SysRes;
+use crate::{flags, sys};
 
 // ===== mmap =====
 
 /// Map files or devices into memory (`mmap(2)`).
-///
-/// If the `fd` is `None`, it replaced with value of `-1`. This is used in anonymous mapping.
 #[inline]
 pub fn mmap<Fd: AsFd + ?Sized>(
     addr: *mut c_void,
     length: usize,
     prot: Prot,
     flags: Flags,
-    fd: Option<&Fd>,
+    fd: &Fd,
     offset: Off,
-) -> Result<NonNull<c_void>> {
-    let fd = fd.map_or(-1, <_>::as_raw_fd);
+) -> impl SysRes<NonNull<c_void>> {
+    mmap_raw(addr, length, prot, flags, fd.as_raw_fd(), offset)
+}
+
+/// Map files or devices into memory (`mmap(2)`).
+///
+/// Same as [`mmap`] but without the `fd` and `offset` argument.
+#[inline]
+pub fn mmap_anon(
+    addr: *mut c_void,
+    length: usize,
+    prot: Prot,
+    flags: Flags,
+) -> impl SysRes<NonNull<c_void>> {
+    mmap_raw(addr, length, prot, flags, -1, 0)
+}
+
+fn mmap_raw(
+    addr: *mut c_void,
+    length: usize,
+    prot: Prot,
+    flags: Flags,
+    fd: i32,
+    offset: Off,
+) -> impl SysRes<NonNull<c_void>> {
     sys::call_rd!(sys_mmap, addr, length, prot.0, flags.0, fd, offset)
-        .io(Kind::Map)
-        .map(|e| unsafe { NonNull::new_unchecked(e as *mut c_void) })
 }
 
 /// Set protection on a region of memory (`mprotect(2)`).
 #[inline]
-pub fn mprotect(addr: *mut c_void, size: usize, prot: Prot) -> Result<()> {
-    sys::call_rd!(sys_mprotect, addr, size, prot.0).e(Kind::Mprotect)
+pub fn mprotect(addr: *mut c_void, size: usize, prot: Prot) -> impl SysRes<()> {
+    sys::call_rd!(sys_mprotect, addr, size, prot.0)
 }
 
 /// Unmap files or devices from memory (`munmap(2)`).
 #[inline]
-pub fn munmap(addr: *mut c_void, length: usize) -> Result<()> {
-    sys::call_rd!(sys_munmap, addr, length).e(Kind::Unmap)
+pub fn munmap(addr: *mut c_void, length: usize) -> impl SysRes<()> {
+    sys::call_rd!(sys_munmap, addr, length)
 }
 
 // ===== Flags =====
@@ -108,39 +126,6 @@ impl Prot {
     pub const GROWSDOWN: Self = Self(PROT_GROWSDOWN);
     /// `PROT_GROWSUP`
     pub const GROWSUP: Self = Self(PROT_GROWSUP);
-}
-
-// ===== Error =====
-
-/// The result of memory mapping operation.
-pub type Result<T, E = Error> = result::Result<T, E>;
-
-/// An error that may occur during any memory mapping operation.
-#[derive(Debug, Clone)]
-pub struct Error {
-    kind: Kind,
-    code: ErrCode,
-}
-
-#[derive(Debug, Clone)]
-enum Kind {
-    Map,
-    Mprotect,
-    Unmap,
-}
-
-error::impl_error_with_kind!(Error, Kind);
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { kind, code } = self;
-        let msg = match kind {
-            Kind::Map => "create memory mapping",
-            Kind::Mprotect => "set protection on memory",
-            Kind::Unmap => "unmap memory mapping",
-        };
-        write!(f, "failed to {msg}: {code}")
-    }
 }
 
 // ===== extern =====

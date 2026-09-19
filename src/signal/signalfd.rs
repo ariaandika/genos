@@ -1,10 +1,8 @@
 //! [`Signalfd`] associated types.
-use core::{fmt, result};
-
-use crate::error::{ErrCode, SysResExt};
-use crate::fd::{AsFd, Open, OwnedFd};
+use crate::fd::{AsFd, OwnedFd};
 use crate::signal::{Signo, Sigset};
-use crate::{error, fd, flags, sys};
+use crate::sys::{SysRes, SysResRaw, arch};
+use crate::{fd, flags, sys};
 
 // ===== Signalfd =====
 
@@ -17,18 +15,18 @@ fd::impl_fd_simple!(Signalfd);
 impl Signalfd {
     /// Create new [`Signalfd`] (`signalfd(2)`).
     #[inline]
-    pub fn create(sigset: &Sigset, flags: Flags) -> Result<Self> {
-        signalfd(-1, sigset, flags).fd(Kind::Create)
+    pub fn create(sigset: &Sigset, flags: Flags) -> impl SysRes<Self> {
+        signalfd(-1, sigset, flags)
     }
 
     /// Replace the associated signal set (`signalfd(2)`).
     #[inline]
-    pub fn set_signal(&self, sigset: &Sigset) -> Result<()> {
-        signalfd(self.as_raw_fd(), sigset, <_>::default()).e(Kind::Set)
+    pub fn set_signal(&self, sigset: &Sigset) -> impl SysRes<()> {
+        signalfd(self.as_raw_fd(), sigset, <_>::default())
     }
 }
 
-fn signalfd(fd: i32, sigset: &Sigset, flags: Flags) -> impl SysResExt {
+fn signalfd<T>(fd: i32, sigset: &Sigset, flags: Flags) -> SysResRaw<T, arch::sys_signalfd> {
     sys::call_rd!(sys_signalfd, fd, sigset.as_ref(), flags.0)
 }
 
@@ -85,54 +83,23 @@ impl Siginfo {
 
 // ===== Flags =====
 
-/// [`Signalfd`] creation flags.
+/// [`Signalfd`] flags.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct Flags(i32);
 
 flags::impl_bitops_simple!(Flags);
 
-impl Flags {
+impl Signalfd {
     /// Set the close-on-exec (FD_CLOEXEC) flag on the new fd.
-    pub const CLOEXEC: Self = Self(SFD_CLOEXEC);
+    pub const CLOEXEC: Flags = Flags(SFD_CLOEXEC);
     /// Set the `O_NONBLOCK` file status flag on the new fd.
-    pub const NONBLOCK: Self = Self(SFD_NONBLOCK);
-}
-
-// ===== Error =====
-
-/// Type alias for result of [`Signalfd`] operations.
-pub type Result<T, E = Error> = result::Result<T, E>;
-
-/// An error that may occur during any [`Signalfd`] operations.
-#[derive(Debug, Clone)]
-pub struct Error {
-    kind: Kind,
-    code: ErrCode,
-}
-
-#[derive(Debug, Clone, Copy)]
-enum Kind {
-    Create,
-    Set,
-}
-
-error::impl_error_with_kind!(Error, Kind);
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { kind, code } = self;
-        let msg = match kind {
-            Kind::Create => "create signalfd",
-            Kind::Set => "set signalfd sigset",
-        };
-        write!(f, "failed to {msg}: {code}")
-    }
+    pub const NONBLOCK: Flags = Flags(SFD_NONBLOCK);
 }
 
 // ===== extern =====
 
 // include/uapi/linux/signalfd.h
 
-const SFD_CLOEXEC: i32 = Open::CLOEXEC.raw();
-const SFD_NONBLOCK: i32 = Open::NONBLOCK.raw();
+const SFD_CLOEXEC: i32 = fd::O_CLOEXEC;
+const SFD_NONBLOCK: i32 = fd::O_NONBLOCK;

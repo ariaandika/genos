@@ -1,8 +1,9 @@
 //! [`clone`] associated types.
-use core::ffi::c_void;
+use core::ffi::{c_long, c_void};
+use core::mem;
 
-use crate::error::{self, ErrCode};
-use crate::{flags, sys};
+use crate::flags;
+use crate::sys::{SysRes, SysResRaw, arch};
 
 /// Create a child process (`clone(2)`).
 ///
@@ -24,7 +25,7 @@ pub unsafe fn clone(
     parent_tid: *mut i32,
     child_tid: *mut i32,
     tls: u64,
-) -> Result<(), Error> {
+) -> impl SysRes<()> {
     unsafe {
         let ret;
         core::arch::asm!(
@@ -37,7 +38,7 @@ pub unsafe fn clone(
             "ret",              // pop the stack, jump to it
 
             "2:",
-            inlateout("rax") sys::sys_clone => ret,
+            inlateout("rax") arch::sys_clone::NO => ret,
             in("rdi") u64::from(flags),
             in("rsi") stack,
             in("rdx") parent_tid,
@@ -47,7 +48,7 @@ pub unsafe fn clone(
             lateout("r11") _,
             options(nostack, preserves_flags),
         );
-        if ret >= 0 { Ok(()) } else { Err(Error(ErrCode::sys(ret))) }
+        mem::transmute::<c_long, SysResRaw<_, arch::sys_clone>>(ret)
     }
 }
 
@@ -65,7 +66,7 @@ pub unsafe fn clone(
 /// extern "C" fn(arg: *mut ()) -> !;
 /// ```
 #[inline]
-pub unsafe fn clone3(args: *const CloneArgs, size: usize) -> Result<(), Error> {
+pub unsafe fn clone3(args: *const CloneArgs, size: usize) -> impl SysRes<()> {
     unsafe {
         let ret;
         core::arch::asm!(
@@ -78,14 +79,14 @@ pub unsafe fn clone3(args: *const CloneArgs, size: usize) -> Result<(), Error> {
             "ret",              // pop the stack, jump to it
 
             "2:",
-            inlateout("rax") sys::sys_clone3 => ret,
+            inlateout("rax") arch::sys_clone3::NO => ret,
             in("rdi") args,
             in("rsi") size,
             lateout("rcx") _,
             lateout("r11") _,
             options(nostack, preserves_flags),
         );
-        if ret >= 0 { Ok(()) } else { Err(Error(ErrCode::sys(ret))) }
+        mem::transmute::<c_long, SysResRaw<_, arch::sys_clone3>>(ret)
     }
 }
 
@@ -126,7 +127,7 @@ impl CloneArgs {
     ///
     /// See [`clone3`].
     #[inline]
-    pub unsafe fn clone3(&self) -> Result<(), Error> {
+    pub unsafe fn clone3(&self) -> impl SysRes<()> {
         unsafe { clone3(self, size_of::<Self>()) }
     }
 }
@@ -209,14 +210,6 @@ impl From<Flags> for u64 {
         value.0
     }
 }
-
-// ===== errors =====
-
-/// An error that may occur during [`clone`] operation.
-#[derive(Clone, Copy)]
-pub struct Error(ErrCode);
-
-error::impl_error_os_simple!(Error, "clone process");
 
 // ===== extern =====
 

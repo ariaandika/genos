@@ -1,6 +1,6 @@
 use core::ffi;
 
-use crate::fd::Open;
+use crate::fd;
 
 // ===== bits/socket.h =====
 
@@ -37,8 +37,8 @@ pub const SOCK_STREAM: i32 = 1;
 pub const SOCK_DGRAM: i32 = 2;
 pub const SOCK_RAW: i32 = 3;
 
-pub const SOCK_CLOEXEC: i32 = Open::CLOEXEC.raw();
-pub const SOCK_NONBLOCK: i32 = Open::NONBLOCK.raw();
+pub const SOCK_CLOEXEC: i32 = fd::O_CLOEXEC;
+pub const SOCK_NONBLOCK: i32 = fd::O_NONBLOCK;
 
 // enum sock_shutdown_cmd
 pub const SHUT_RD: i32 = 0;

@@ -1,15 +1,13 @@
 use core::ffi::c_void;
-use core::mem;
 use core::ptr::NonNull;
 
-use crate::sys;
+use crate::sys::{self, SysRes};
 
 /// Sets the end of the data segment to given value (`brk(2)`).
 ///
 /// Note that this is pure system calls to `brk`, any explanation in `brk(2)` may refer to glibc
 /// implementation.
 #[inline]
-pub fn brk(addr: *mut c_void) -> NonNull<c_void> {
-    let res = sys::call_rd!(sys_brk, addr).into_inner();
-    unsafe { mem::transmute::<isize, NonNull<c_void>>(res) }
+pub fn brk(addr: *mut c_void) -> impl SysRes<NonNull<c_void>> {
+    sys::call_rd!(sys_brk, addr)
 }

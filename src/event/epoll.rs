@@ -1,10 +1,9 @@
 //! [`Epoll`] associated types.
 use core::mem::MaybeUninit;
-use core::{fmt, result};
 
-use crate::error::{ErrCode, SysResExt};
-use crate::fd::{AsFd, Open, OwnedFd};
-use crate::{error, fd, flags, sys};
+use crate::fd::{AsFd, OwnedFd};
+use crate::sys::SysRes;
+use crate::{fd, flags, sys};
 
 // ===== Epoll =====
 
@@ -17,45 +16,46 @@ fd::impl_fd_simple!(Epoll);
 impl Epoll {
     /// Creates new [`Epoll`] (`epoll_create1(2)`).
     #[inline]
-    pub fn create(flags: Flags) -> Result<Self> {
-        sys::call_rd!(sys_epoll_create1, flags.0).fd(Kind::Create)
+    pub fn create(flags: Flags) -> impl SysRes<Self> {
+        sys::call_rd!(sys_epoll_create1, flags.0)
     }
 
+    #[inline]
+    fn epoll_ctl<Fd: AsFd + ?Sized>(&self, op: i32, fd: &Fd, ev: *const Event) -> impl SysRes<()> {
+        sys::call_rd!(sys_epoll_ctl, self.as_raw_fd(), op, fd.as_raw_fd(), ev)
+    }
+
+    /// Waits for events `epoll_wait(2)`.
+    #[inline]
+    pub fn wait(&self, buf: &mut [MaybeUninit<Event>], timeout: i32) -> impl SysRes<usize> {
+        sys::call!(sys_epoll_wait, self.as_raw_fd(), buf.as_mut_ptr(), buf.len(), timeout)
+    }
+}
+
+impl Epoll {
     /// Add an entry to the interest list (`epoll_ctl(2)`).
     ///
     /// [`InputFlags`] can be added by `OR`-ing with [`EventType`].
     #[inline]
-    pub fn add<Fd: AsFd + ?Sized>(&self, fd: &Fd, events: EventType, data: u64) -> Result<()> {
-        self.epoll_ctl(EPOLL_CTL_ADD, fd, &Event { events, data }, Kind::Add)
+    pub fn add<Fd: AsFd + ?Sized>(&self, fd: &Fd, events: EventType, data: u64) -> impl SysRes<()> {
+        self.epoll_ctl(EPOLL_CTL_ADD, fd, &Event { events, data })
     }
 
     /// Change the settings associated with fd in the interest list (`epoll_ctl(2)`).
     ///
     /// [`InputFlags`] can be added by `OR`-ing with [`EventType`].
     #[inline]
-    pub fn modify<Fd: AsFd + ?Sized>(&self, fd: &Fd, events: EventType, data: u64) -> Result<()> {
-        self.epoll_ctl(EPOLL_CTL_MOD, fd, &Event { events, data }, Kind::Mod)
+    pub fn modify<Fd>(&self, fd: &Fd, events: EventType, data: u64) -> impl SysRes<()>
+    where
+        Fd: AsFd + ?Sized,
+    {
+        self.epoll_ctl(EPOLL_CTL_MOD, fd, &Event { events, data })
     }
 
     /// Remove (deregister) the target fd from the interest list (`epoll_ctl(2)`).
     #[inline]
-    pub fn delete<Fd: AsFd + ?Sized>(&self, fd: &Fd) -> Result<()> {
-        self.epoll_ctl(EPOLL_CTL_DEL, fd, 0 as _, Kind::Del)
-    }
-
-    #[inline]
-    fn epoll_ctl<Fd>(&self, op: i32, fd: &Fd, ev: *const Event, er: Kind) -> Result<()>
-    where
-        Fd: AsFd + ?Sized,
-    {
-        sys::call_rd!(sys_epoll_ctl, self.as_raw_fd(), op, fd.as_raw_fd(), ev).e(er)
-    }
-
-    /// Waits for events `epoll_wait(2)`.
-    #[inline]
-    pub fn wait(&self, buf: &mut [MaybeUninit<Event>], timeout: i32) -> Result<usize> {
-        sys::call!(sys_epoll_wait, self.as_raw_fd(), buf.as_mut_ptr(), buf.len(), timeout)
-            .io(Kind::Wait)
+    pub fn delete<Fd: AsFd + ?Sized>(&self, fd: &Fd) -> impl SysRes<()> {
+        self.epoll_ctl(EPOLL_CTL_DEL, fd, 0 as _)
     }
 }
 
@@ -65,10 +65,9 @@ impl Epoll {
 #[derive(Debug, Default, Clone)]
 #[repr(C, packed)]
 pub struct Event {
-    /// Event types returned by [`Epoll::wait`], and input flags, which affect its behaviour, but
-    /// not returned.
+    /// `epoll_event.events`
     pub events: EventType,
-    /// Data that the kernel should save and then return when associated fd becomes ready.
+    /// `epoll_event.data`
     pub data: u64,
 }
 
@@ -111,26 +110,6 @@ impl Epoll {
     pub const RDHUP: EventType = EventType(EPOLLRDHUP);
 }
 
-impl EventType {
-    /// Returns `true` if events contains `EPOLLIN`.
-    #[inline]
-    pub const fn has_read(self) -> bool {
-        self.0 & Epoll::IN.0 != 0
-    }
-
-    /// Returns `true` if events contains `EPOLLOUT`.
-    #[inline]
-    pub const fn has_write(self) -> bool {
-        self.0 & Epoll::OUT.0 != 0
-    }
-
-    /// Returns `true` if events contains `EPOLLRDHUP`.
-    #[inline]
-    pub const fn has_rdhup(self) -> bool {
-        self.0 & Epoll::RDHUP.0 != 0
-    }
-}
-
 // ===== InputFlags =====
 
 /// [`Event`] input flags (`epoll_ctl(2)`).
@@ -138,59 +117,25 @@ impl EventType {
 #[repr(transparent)]
 pub struct InputFlags(u32);
 
+flags::impl_bitops_simple!(InputFlags);
+flags::impl_bitops_simple!(InputFlags, EventType, Output = EventType);
+
 impl Epoll {
-    /// `EPOLLET`
-    pub const ET: InputFlags = InputFlags(EPOLLET);
-    /// `EPOLLONESHOT`
-    pub const ONESHOT: InputFlags = InputFlags(EPOLLONESHOT);
-    /// `EPOLLWAKEUP`
-    pub const WAKEUP: InputFlags = InputFlags(EPOLLWAKEUP);
     /// `EPOLLEXCLUSIVE`
     pub const EXCLUSIVE: InputFlags = InputFlags(EPOLLEXCLUSIVE);
-}
-
-// ===== Error =====
-
-/// The result of [`Epoll`] operations.
-pub type Result<T> = result::Result<T, Error>;
-
-/// An error that may occur during any [`Epoll`] operations.
-#[derive(Debug, Clone)]
-pub struct Error {
-    kind: Kind,
-    code: ErrCode,
-}
-
-#[derive(Debug, Clone)]
-enum Kind {
-    Create,
-    Add,
-    Mod,
-    Del,
-    Wait,
-}
-
-error::impl_error_with_kind!(Error, Kind);
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let Self { kind, code } = self;
-        let msg = match kind {
-            Kind::Create => "create epoll",
-            Kind::Add => "add fd to epoll",
-            Kind::Mod => "modify fd on the epoll",
-            Kind::Del => "delete fd on the epoll",
-            Kind::Wait => "wait for epoll event",
-        };
-        write!(f, "failed to {msg}: {code}")
-    }
+    /// `EPOLLWAKEUP`
+    pub const WAKEUP: InputFlags = InputFlags(EPOLLWAKEUP);
+    /// `EPOLLONESHOT`
+    pub const ONESHOT: InputFlags = InputFlags(EPOLLONESHOT);
+    /// `EPOLLET`
+    pub const ET: InputFlags = InputFlags(EPOLLET);
 }
 
 // ===== extern =====
 
 // include/uapi/linux/eventpoll.h
 
-const EPOLL_CLOEXEC: i32 = Open::CLOEXEC.raw();
+const EPOLL_CLOEXEC: i32 = fd::O_CLOEXEC;
 
 const EPOLL_CTL_ADD: i32 = 1;
 const EPOLL_CTL_DEL: i32 = 2;
@@ -202,6 +147,7 @@ const EPOLLOUT: u32 = 0x00000004;
 const EPOLLERR: u32 = 0x00000008;
 const EPOLLHUP: u32 = 0x00000010;
 const EPOLLRDHUP: u32 = 0x00002000;
+
 const EPOLLEXCLUSIVE: u32 = 1 << 28;
 const EPOLLWAKEUP: u32 = 1 << 29;
 const EPOLLONESHOT: u32 = 1 << 30;

@@ -1,10 +1,10 @@
 //! Signal management.
 pub use signo::Signo;
 #[doc(inline)]
-pub use sigset::Sigset;
+pub use sigset::{Sigset, rt_sigprocmask};
 #[doc(inline)]
 pub use signalfd::Signalfd;
 
 mod signo;
-pub mod sigset;
+mod sigset;
 pub mod signalfd;

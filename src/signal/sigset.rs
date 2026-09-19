@@ -1,9 +1,8 @@
-//! [`Sigset`] associated types.
-use core::{ffi, mem, result};
+use core::mem::MaybeUninit;
+use core::{ffi, mem};
 
-use crate::error::{ErrCode, SysResExt};
 use crate::signal::Signo;
-use crate::{error, sys};
+use crate::sys::{self, SysRes, optmut};
 
 // ===== Sigset =====
 
@@ -58,47 +57,74 @@ impl Default for Sigset {
 impl Sigset {
     /// Returns the current value of the signal mask.
     #[inline]
-    pub fn current() -> Self {
-        let mut set = mem::MaybeUninit::uninit();
+    pub fn new_current() -> Self {
+        let mut me = MaybeUninit::uninit();
         // possible errors are EFAULT and EINVAL
-        let _res = rt_sigprocmask(0, 0 as _, set.as_mut_ptr()).into_inner();
-        debug_assert!(_res >= 0);
-        unsafe { set.assume_init() }
+        rt_sigprocmask(Self::ZERO, None, Some(&mut me));
+        unsafe { me.assume_init() }
+    }
+
+    /// Get the current value of the signal mask.
+    #[inline]
+    pub fn current(&mut self) {
+        // possible errors are EFAULT and EINVAL
+        rt_sigprocmask(Self::ZERO, None, optuninit(Some(self)));
     }
 
     /// Set the blocked signals to the union of the current set and this set.
     #[inline]
-    pub fn block(&self) -> Result<()> {
-        rt_sigprocmask(SIG_BLOCK, self, 0 as _).e2()
+    pub fn block(&self) -> impl SysRes<()> {
+        rt_sigprocmask(Self::BLOCK, Some(self), None)
     }
 
     /// Remove the blocked signals that is in this set.
     #[inline]
-    pub fn unblock(&self) -> Result<()> {
-        rt_sigprocmask(SIG_UNBLOCK, self, 0 as _).e2()
+    pub fn unblock(&self) -> impl SysRes<()> {
+        rt_sigprocmask(Self::UNBLOCK, Some(self), None)
     }
 
     /// Set the blocked signals to this set.
     #[inline]
-    pub fn setmask(&self) -> Result<()> {
-        rt_sigprocmask(SIG_SETMASK, self, 0 as _).e2()
+    pub fn setmask(&self) -> impl SysRes<()> {
+        rt_sigprocmask(Self::SETMASK, Some(self), None)
     }
 }
 
-fn rt_sigprocmask(how: i32, new: *const Sigset, old: *mut Sigset) -> impl SysResExt {
-    sys::call!(sys_rt_sigprocmask, how, new, old, size_of::<Sigset>())
+fn optref<T>(opt: Option<&T>) -> *const T {
+    // this will generate to just a `mov`
+    opt.map_or(core::ptr::null_mut(), |e| e as *const _)
 }
 
-// ===== Error =====
+fn optuninit<T>(opt: Option<&mut T>) -> Option<&mut MaybeUninit<T>> {
+    unsafe { mem::transmute(opt) }
+}
 
-/// The result of changing blocked signals.
-pub type Result<T, E = Error> = result::Result<T, E>;
+/// Examine and change blocked signals (`rt_sigprocmask(2)`).
+#[inline]
+pub fn rt_sigprocmask(
+    how: SigHow,
+    new: Option<&Sigset>,
+    old: Option<&mut MaybeUninit<Sigset>>,
+) -> impl SysRes<()> {
+    sys::call!(sys_rt_sigprocmask, how.0, optref(new), optmut(old), size_of::<Sigset>())
+}
 
-/// An error that may occur when changing blocked signals.
-#[derive(Clone, Copy)]
-pub struct Error(ErrCode);
+// ===== SigHow =====
 
-error::impl_error_os_simple!(Error, "change blocked signals");
+/// [`rt_sigprocmask`] operation.
+#[derive(Debug, Clone, Copy)]
+#[repr(transparent)]
+pub struct SigHow(i32);
+
+impl Sigset {
+    const ZERO: SigHow = SigHow(0);
+    /// `SIG_BLOCK`
+    pub const BLOCK: SigHow = SigHow(SIG_BLOCK);
+    /// `SIG_UNBLOCK`
+    pub const UNBLOCK: SigHow = SigHow(SIG_UNBLOCK);
+    /// `SIG_SETMASK`
+    pub const SETMASK: SigHow = SigHow(SIG_SETMASK);
+}
 
 // ===== extern =====
 
