@@ -1,18 +1,5 @@
 //! Bit flags helper.
 
-/// Common bitflag values for opening file descriptor.
-pub trait OpenFlag {
-    /// Enable the close-on-exec flag for the new file descriptor.
-    ///
-    /// If the associated API does not support this, the value is empty.
-    const CLOEXEC: Self;
-
-    /// Open the file in non-blocking mode.
-    ///
-    /// If the associated API does not support this, the value is empty.
-    const NONBLOCK: Self;
-}
-
 macro_rules! impl_bitops_simple {
     ($me:ident) => {
         crate::flags::impl_bitops_simple!($me, Self, Output = Self);

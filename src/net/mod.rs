@@ -3,8 +3,6 @@
 pub use socket::Socket;
 pub use raw::SaFamily;
 
-pub use crate::flags::OpenFlag;
-
 // ===== mods =====
 
 mod raw;
