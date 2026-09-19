@@ -1,8 +1,10 @@
 //! [`Signalfd`] associated types.
+use core::mem::MaybeUninit;
+
 use crate::fd::{AsFd, OwnedFd};
 use crate::signal::{Signo, Sigset};
 use crate::sys::{SysRes, SysResRaw, arch};
-use crate::{fd, flags, sys};
+use crate::{fd, flags, io, sys};
 
 // ===== Signalfd =====
 
@@ -23,6 +25,15 @@ impl Signalfd {
     #[inline]
     pub fn set_signal(&self, sigset: &Sigset) -> impl SysRes<()> {
         signalfd(self.as_raw_fd(), sigset, <_>::default())
+    }
+
+    /// Read and consume caught pending signals.
+    ///
+    /// Returns the number of `Siginfo` struct returned.
+    #[inline]
+    pub fn read(&self, buf: &mut [MaybeUninit<Siginfo>]) -> impl SysRes<usize> {
+        io::read_raw(self.as_raw_fd(), buf.as_mut_ptr(), size_of_val(buf))
+            .map(|read| (read as usize).wrapping_div(size_of::<Siginfo>()) as _)
     }
 }
 
