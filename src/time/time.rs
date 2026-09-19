@@ -12,6 +12,12 @@ pub fn time(tloc: Option<&mut Time>) -> impl SysRes<Time> {
     sys::call!(sys_time, sys::optmut(tloc))
 }
 
+/// High-resolution sleep (`nanosleep(2)`).
+#[inline]
+pub fn nanosleep(duration: &Timespec, rem: Option<&mut Timespec>) -> impl SysRes<()> {
+    sys::call!(sys_nanosleep, duration, sys::optmut(rem))
+}
+
 // ===== Timespec =====
 
 /// Time in seconds and nanoseconds.

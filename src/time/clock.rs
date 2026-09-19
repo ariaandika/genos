@@ -2,6 +2,7 @@
 use core::mem::MaybeUninit;
 
 use crate::ffi::Char;
+use crate::flags;
 use crate::sys::{self, SysRes};
 use crate::time::Timespec;
 
@@ -54,6 +55,17 @@ impl Clock {
     pub fn set_time(self, tp: &Timespec) -> impl SysRes<()> {
         sys::call_rd!(sys_clock_settime, self.0, tp)
     }
+
+    /// High-resolution sleep with this clock.
+    #[inline]
+    pub fn nanosleep(
+        self,
+        flags: Flags,
+        t: &Timespec,
+        remain: Option<&mut Timespec>,
+    ) -> impl SysRes<()> {
+        sys::call!(sys_clock_nanosleep, flags.0, t, sys::optmut(remain))
+    }
 }
 
 impl From<Clock> for i32 {
@@ -61,6 +73,20 @@ impl From<Clock> for i32 {
     fn from(value: Clock) -> Self {
         value.0
     }
+}
+
+// ===== Flags =====
+
+/// `clock_nanosleep(2)` flags.
+#[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
+#[repr(transparent)]
+pub struct Flags(i32);
+
+flags::impl_bitops_simple!(Flags);
+
+impl Flags {
+    /// `TIMER_ABSTIME`
+    pub const ABSTIME: Flags = Flags(TIMER_ABSTIME);
 }
 
 // ===== extern =====
@@ -78,3 +104,5 @@ const CLOCK_BOOTTIME: i32 = 7;
 const CLOCK_REALTIME_ALARM: i32 = 8;
 const CLOCK_BOOTTIME_ALARM: i32 = 9;
 const CLOCK_TAI: i32 = 11;
+
+const TIMER_ABSTIME: i32 = 0x01;

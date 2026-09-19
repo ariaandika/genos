@@ -47,6 +47,7 @@ defv2! {
     18  common  pwrite64            sys_pwrite64
     19  64      readv               sys_readv
     20  64      writev              sys_writev
+    35  common  nanosleep           sys_nanosleep
     39  common  getpid              sys_getpid
     40  common  sendfile            sys_sendfile64
     41  common  socket              sys_socket
@@ -77,6 +78,7 @@ defv2! {
     227 common  clock_settime       sys_clock_settime
     228 common  clock_gettime       sys_clock_gettime
     229 common  clock_getres        sys_clock_getres
+    230 common  clock_nanosleep     sys_clock_nanosleep
     232 common  epoll_wait          sys_epoll_wait
     233 common  epoll_ctl           sys_epoll_ctl
     275 common  splice              sys_splice
@@ -117,7 +119,6 @@ defv2! {
 // 32  common  dup         sys_dup
 // 33  common  dup2            sys_dup2
 // 34  common  pause           sys_pause
-// 35  common  nanosleep       sys_nanosleep
 // 36  common  getitimer       sys_getitimer
 // 37  common  alarm           sys_alarm
 // 38  common  setitimer       sys_setitimer
@@ -283,7 +284,6 @@ defv2! {
 // 224 common  timer_gettime       sys_timer_gettime
 // 225 common  timer_getoverrun    sys_timer_getoverrun
 // 226 common  timer_delete        sys_timer_delete
-// 230 common  clock_nanosleep     sys_clock_nanosleep
 // 231 common  exit_group      sys_exit_group          -           noreturn
 // 234 common  tgkill          sys_tgkill
 // 235 common  utimes          sys_utimes
