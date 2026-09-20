@@ -20,36 +20,37 @@ pub trait SysRes<T>: sealed::SealedRes<T> + Sized {
         self.raw()
     }
 
-    /// Panic
-    #[inline]
-    #[expect(clippy::panic, reason = "this will cover all panic use cases")]
-    fn unwrap(self) -> T {
-        let raw = self.raw();
-        if raw >= 0 {
-            Self::ok_from_raw(raw)
-        } else {
-            panic!("`{}` syscall failed: {}", Self::NAME, ErrCode::sys(raw as _))
-        }
-    }
-
     /// Checks for error and returns [`Result<T, ErrCode>`].
     #[inline]
     fn rescode(self) -> Result<T, ErrCode> {
         let raw = self.raw();
-        if raw >= 0 { Ok(Self::ok_from_raw(raw)) } else { Err(ErrCode::sys(raw as _)) }
+        if raw >= 0 {
+            Ok(Self::ok_from_raw(raw))
+        } else {
+            // SAFETY: `raw < 0`
+            unsafe { Err(ErrCode::new(raw as _)) }
+        }
     }
 
     /// Checks for error and returns [`Result<T, E>`].
     ///
-    /// The custom error must implement [`FromSysErr`].
+    /// The custom error needs to implement [`FromSysErr`].
     #[inline]
     fn result<E: FromSysErr<Self::Sysno>>(self) -> Result<T, E> {
-        let raw = self.raw();
-        if raw >= 0 {
-            Ok(Self::ok_from_raw(raw))
-        } else {
-            Err(E::from_syserr(ErrCode::sys(raw as _)))
+        self.rescode().map_err(E::from_syserr)
+    }
+
+    /// Returns the success value.
+    ///
+    /// Panics if the result is an error code.
+    #[inline]
+    #[expect(clippy::panic, reason = "this will cover all panic use cases")]
+    fn unwrap(self) -> T {
+        let res = self.raw();
+        if res < 0 {
+            panic!("`{}` call returns {}", Self::NAME, res)
         }
+        Self::ok_from_raw(res)
     }
 }
 

@@ -24,7 +24,9 @@ pub fn fork() -> impl SysRes<Pid> {
 /// Executes the program referred to by path (`execve(2)`).
 #[inline]
 pub fn execve(path: &Char, argv: &Option<&Char>, envp: &Option<&Char>) -> ErrCode {
-    ErrCode::sys(SysRes::<()>::into_raw(sys::call_rd!(sys_execve, path, argv, envp)) as _)
+    let res = sys::call_rd!(sys_execve, path, argv, envp);
+    // SAFETY: if `execve` returns, its an error
+    unsafe { ErrCode::new(SysRes::<()>::into_raw(res) as _) }
 }
 
 /// Send a signal to process this struct refers to (`kill(2)`).
