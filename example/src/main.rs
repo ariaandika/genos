@@ -164,19 +164,20 @@ fn panic_me(info: &core::panic::PanicInfo) -> ! {
 #[unsafe(no_mangle)]
 extern "C" fn rust_eh_personality() {}
 
-#[cfg(debug_assertions)] // `--release` seems work fine
+// `compiler_builtins`
+
 #[unsafe(no_mangle)]
 unsafe extern "C" fn memset(
-    ptr: *mut core::ffi::c_void,
-    val: i32,
-    n: usize,
+    dest: *mut core::ffi::c_void,
+    c: core::ffi::c_int,
+    count: usize,
 ) -> *mut core::ffi::c_void {
-    let mut p = ptr.cast::<u8>();
-    for _ in 0..n {
-        unsafe {
-            p.write(val as u8);
-            p = p.add(1);
-        }
-    }
-    ptr
+    core::arch::asm!(
+        "repe stosb %al, (%rdi)",
+        inout("rcx") count => _,
+        inout("rdi") dest => _,
+        inout("al") c as u8 => _,
+        options(att_syntax, nostack, preserves_flags)
+    );
+    dest
 }
