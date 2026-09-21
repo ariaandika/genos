@@ -2,7 +2,7 @@
 use core::mem::MaybeUninit;
 
 use crate::fd::{AsFd, OwnedFd};
-use crate::sys::SysRes;
+use crate::sys::{Error, arch};
 use crate::{fd, flags, sys};
 
 // ===== Epoll =====
@@ -16,18 +16,27 @@ fd::impl_fd_simple!(Epoll);
 impl Epoll {
     /// Creates new [`Epoll`] (`epoll_create1(2)`).
     #[inline]
-    pub fn create(flags: Flags) -> impl SysRes<Self> {
+    pub fn create(flags: Flags) -> Result<Self, Error<arch::sys_epoll_create1>> {
         sys::call_rd!(sys_epoll_create1, flags.0)
     }
 
     #[inline]
-    fn epoll_ctl<Fd: AsFd + ?Sized>(&self, op: i32, fd: &Fd, ev: *const Event) -> impl SysRes<()> {
+    fn epoll_ctl<Fd: AsFd + ?Sized>(
+        &self,
+        op: i32,
+        fd: &Fd,
+        ev: *const Event,
+    ) -> Result<(), Error<arch::sys_epoll_ctl>> {
         sys::call_rd!(sys_epoll_ctl, self.as_raw_fd(), op, fd.as_raw_fd(), ev)
     }
 
     /// Waits for events `epoll_wait(2)`.
     #[inline]
-    pub fn wait(&self, buf: &mut [MaybeUninit<Event>], timeout: i32) -> impl SysRes<usize> {
+    pub fn wait(
+        &self,
+        buf: &mut [MaybeUninit<Event>],
+        timeout: i32,
+    ) -> Result<usize, Error<arch::sys_epoll_wait>> {
         sys::call!(sys_epoll_wait, self.as_raw_fd(), buf.as_mut_ptr(), buf.len(), timeout)
     }
 }
@@ -37,7 +46,12 @@ impl Epoll {
     ///
     /// [`InputFlags`] can be added by `OR`-ing with [`EventType`].
     #[inline]
-    pub fn add<Fd: AsFd + ?Sized>(&self, fd: &Fd, events: EventType, data: u64) -> impl SysRes<()> {
+    pub fn add<Fd: AsFd + ?Sized>(
+        &self,
+        fd: &Fd,
+        events: EventType,
+        data: u64,
+    ) -> Result<(), Error<arch::sys_epoll_ctl>> {
         self.epoll_ctl(EPOLL_CTL_ADD, fd, &Event { events, data })
     }
 
@@ -45,7 +59,12 @@ impl Epoll {
     ///
     /// [`InputFlags`] can be added by `OR`-ing with [`EventType`].
     #[inline]
-    pub fn modify<Fd>(&self, fd: &Fd, events: EventType, data: u64) -> impl SysRes<()>
+    pub fn modify<Fd>(
+        &self,
+        fd: &Fd,
+        events: EventType,
+        data: u64,
+    ) -> Result<(), Error<arch::sys_epoll_ctl>>
     where
         Fd: AsFd + ?Sized,
     {
@@ -54,7 +73,7 @@ impl Epoll {
 
     /// Remove (deregister) the target fd from the interest list (`epoll_ctl(2)`).
     #[inline]
-    pub fn delete<Fd: AsFd + ?Sized>(&self, fd: &Fd) -> impl SysRes<()> {
+    pub fn delete<Fd: AsFd + ?Sized>(&self, fd: &Fd) -> Result<(), Error<arch::sys_epoll_ctl>> {
         self.epoll_ctl(EPOLL_CTL_DEL, fd, 0 as _)
     }
 }

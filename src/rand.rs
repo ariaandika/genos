@@ -1,12 +1,15 @@
 //! Random number generator.
 use core::mem::MaybeUninit;
 
-use crate::sys::SysRes;
+use crate::sys::{Error, arch};
 use crate::{flags, sys};
 
 /// Generate a random number to the given buffer (`getrandom(2)`).
 #[inline]
-pub fn getrandom(buf: &mut [MaybeUninit<u8>], flags: Flags) -> impl SysRes<usize> {
+pub fn getrandom(
+    buf: &mut [MaybeUninit<u8>],
+    flags: Flags,
+) -> Result<usize, Error<arch::sys_getrandom>> {
     sys::call!(sys_getrandom, buf.as_mut_ptr(), buf.len(), flags.0)
 }
 

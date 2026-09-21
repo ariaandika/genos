@@ -6,9 +6,6 @@ pub use write::{write, pwrite, writev, pwritev};
 pub use stream::{Stderr, Stdin, Stdout};
 pub use splice::{SpliceFlags, sendfile, splice, tee, vmsplice};
 
-pub(crate) use read::read_raw;
-pub(crate) use write::write_raw;
-
 mod iovec;
 mod flags;
 mod stream;

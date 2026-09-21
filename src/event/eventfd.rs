@@ -1,9 +1,7 @@
 //! [`Eventfd`] associated types.
-use core::mem::MaybeUninit;
-
-use crate::fd::{self, AsFd, OwnedFd};
-use crate::sys::{self, SysRes};
-use crate::{flags, io};
+use crate::fd::{self, OwnedFd};
+use crate::flags;
+use crate::sys::{self, Error, arch};
 
 // ===== Eventfd =====
 
@@ -16,28 +14,8 @@ fd::impl_fd_simple!(Eventfd);
 impl Eventfd {
     /// Creates new [`Eventfd`] (`eventfd(2)`).
     #[inline]
-    pub fn create(initval: u32, flags: i32) -> impl SysRes<Self> {
+    pub fn create(initval: u32, flags: i32) -> Result<Self, Error<arch::sys_eventfd2>> {
         sys::call_rd!(sys_eventfd2, initval, flags)
-    }
-
-    /// Read and consume the counter to given buffer.
-    #[inline]
-    pub fn read_to(&self, buf: &mut MaybeUninit<u64>) -> impl SysRes<()> {
-        io::read_raw(self.as_raw_fd(), buf, size_of::<u64>()).drop()
-    }
-
-    /// Read, consume, and returns the counter.
-    #[inline]
-    pub fn read(&self) -> impl SysRes<u64> {
-        let mut buf = MaybeUninit::<u64>::uninit();
-        io::read_raw(self.as_raw_fd(), buf.as_mut_ptr(), size_of::<u64>())
-            .map(|_| unsafe { buf.assume_init() as _ })
-    }
-
-    /// Add the counter by `add`.
-    #[inline]
-    pub fn write(&self, add: u64) -> impl SysRes<()> {
-        io::write_raw(self.as_raw_fd(), &add, size_of::<u64>()).drop()
     }
 }
 

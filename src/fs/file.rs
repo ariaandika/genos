@@ -1,7 +1,7 @@
 //! [`File`] associated types.
 use crate::fd::{AsFd, Open, OwnedFd};
 use crate::ffi::{Char, Mode, Off};
-use crate::sys::SysRes;
+use crate::sys::{Error, arch};
 use crate::{fd, sys};
 
 /// Open file descriptor.
@@ -13,26 +13,26 @@ fd::impl_fd_simple!(File);
 impl File {
     /// Opens specified file (`open(2)`).
     #[inline]
-    pub fn open(path: &Char, mode: Open) -> impl SysRes<Self> {
+    pub fn open(path: &Char, mode: Open) -> Result<Self, Error<arch::sys_open>> {
         sys::call_rd!(sys_open, path, mode.raw())
     }
 
     /// Create file if does not exists, open in write-only mode, and truncate to length 0
     /// (`creat(2)`).
     #[inline]
-    pub fn create(path: &Char, mode: Mode) -> impl SysRes<Self> {
+    pub fn create(path: &Char, mode: Mode) -> Result<Self, Error<arch::sys_creat>> {
         sys::call_rd!(sys_creat, path, mode)
     }
 
     /// Reposition read/write offset (`lseek(2)`).
     #[inline]
-    pub fn seek(&self, offset: Off, seek: Seek) -> impl SysRes<Off> {
+    pub fn seek(&self, offset: Off, seek: Seek) -> Result<Off, Error<arch::sys_lseek>> {
         sys::call_rd!(sys_lseek, self.as_raw_fd(), offset, seek.0)
     }
 
     /// Truncate file to a size of precisely length bytes (`ftruncate(2)`).
     #[inline]
-    pub fn truncate(&self, length: Off) -> impl SysRes<()> {
+    pub fn truncate(&self, length: Off) -> Result<(), Error<arch::sys_ftruncate>> {
         sys::call_rd!(sys_ftruncate, self.as_raw_fd(), length)
     }
 }

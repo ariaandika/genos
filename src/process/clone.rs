@@ -1,9 +1,8 @@
 //! [`clone`] associated types.
-use core::ffi::{c_long, c_void};
-use core::mem;
+use core::ffi::c_void;
 
 use crate::flags;
-use crate::sys::{SysRes, SysResRaw, arch};
+use crate::sys::{Error, SysId, arch};
 
 /// Create a child process (`clone(2)`).
 ///
@@ -25,7 +24,7 @@ pub unsafe fn clone(
     parent_tid: *mut i32,
     child_tid: *mut i32,
     tls: u64,
-) -> impl SysRes<()> {
+) -> Result<(), Error<arch::sys_clone>> {
     unsafe {
         let ret;
         core::arch::asm!(
@@ -48,7 +47,7 @@ pub unsafe fn clone(
             lateout("r11") _,
             options(nostack, preserves_flags),
         );
-        mem::transmute::<c_long, SysResRaw<_, arch::sys_clone>>(ret)
+        Error::from_raw(ret)
     }
 }
 
@@ -66,7 +65,7 @@ pub unsafe fn clone(
 /// extern "C" fn(arg: *mut ()) -> !;
 /// ```
 #[inline]
-pub unsafe fn clone3(args: *const CloneArgs, size: usize) -> impl SysRes<()> {
+pub unsafe fn clone3(args: *const CloneArgs, size: usize) -> Result<(), Error<arch::sys_clone3>> {
     unsafe {
         let ret;
         core::arch::asm!(
@@ -86,7 +85,7 @@ pub unsafe fn clone3(args: *const CloneArgs, size: usize) -> impl SysRes<()> {
             lateout("r11") _,
             options(nostack, preserves_flags),
         );
-        mem::transmute::<c_long, SysResRaw<_, arch::sys_clone3>>(ret)
+        Error::from_raw(ret)
     }
 }
 
@@ -127,7 +126,7 @@ impl CloneArgs {
     ///
     /// See [`clone3`].
     #[inline]
-    pub unsafe fn clone3(&self) -> impl SysRes<()> {
+    pub unsafe fn clone3(&self) -> Result<(), Error<arch::sys_clone3>> {
         unsafe { clone3(self, size_of::<Self>()) }
     }
 }

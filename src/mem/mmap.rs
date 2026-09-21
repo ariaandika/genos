@@ -4,7 +4,7 @@ use core::ptr::NonNull;
 
 use crate::fd::AsFd;
 use crate::ffi::Off;
-use crate::sys::SysRes;
+use crate::sys::{Error, arch};
 use crate::{flags, sys};
 
 // ===== mmap =====
@@ -18,7 +18,7 @@ pub fn mmap<Fd: AsFd + ?Sized>(
     flags: Flags,
     fd: &Fd,
     offset: Off,
-) -> impl SysRes<NonNull<c_void>> {
+) -> Result<NonNull<c_void>, Error<arch::sys_mmap>> {
     mmap_raw(addr, length, prot, flags, fd.as_raw_fd(), offset)
 }
 
@@ -31,7 +31,7 @@ pub fn mmap_anon(
     length: usize,
     prot: Prot,
     flags: Flags,
-) -> impl SysRes<NonNull<c_void>> {
+) -> Result<NonNull<c_void>, Error<arch::sys_mmap>> {
     mmap_raw(addr, length, prot, flags, -1, 0)
 }
 
@@ -42,19 +42,23 @@ fn mmap_raw(
     flags: Flags,
     fd: i32,
     offset: Off,
-) -> impl SysRes<NonNull<c_void>> {
+) -> Result<NonNull<c_void>, Error<arch::sys_mmap>> {
     sys::call_rd!(sys_mmap, addr, length, prot.0, flags.0, fd, offset)
 }
 
 /// Set protection on a region of memory (`mprotect(2)`).
 #[inline]
-pub fn mprotect(addr: *mut c_void, size: usize, prot: Prot) -> impl SysRes<()> {
+pub fn mprotect(
+    addr: *mut c_void,
+    size: usize,
+    prot: Prot,
+) -> Result<(), Error<arch::sys_mprotect>> {
     sys::call_rd!(sys_mprotect, addr, size, prot.0)
 }
 
 /// Unmap files or devices from memory (`munmap(2)`).
 #[inline]
-pub fn munmap(addr: *mut c_void, length: usize) -> impl SysRes<()> {
+pub fn munmap(addr: *mut c_void, length: usize) -> Result<(), Error<arch::sys_munmap>> {
     sys::call_rd!(sys_munmap, addr, length)
 }
 

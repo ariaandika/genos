@@ -1,6 +1,6 @@
 use core::{ffi, fmt, marker};
 
-use crate::sys::{self, SysResRaw};
+use crate::sys;
 
 // ===== types =====
 
@@ -82,6 +82,6 @@ impl OwnedFd {
 impl Drop for OwnedFd {
     #[inline]
     fn drop(&mut self) {
-        let _: SysResRaw<(), _> = sys::call_rd!(sys_close, self.0);
+        sys::call_rd_raw!(sys_close, self.0);
     }
 }

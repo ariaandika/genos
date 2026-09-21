@@ -8,10 +8,16 @@ use core::num::NonZeroI16;
 pub struct ErrCode(NonZeroI16);
 
 impl ErrCode {
-    /// `code` must be negative.
+    /// # Safety
+    ///
+    /// `code < 0`.
     pub(crate) const unsafe fn new(code: i16) -> Self {
         debug_assert!(code.is_negative());
         unsafe { Self(NonZeroI16::new_unchecked(code)) }
+    }
+
+    pub(crate) const fn from_sys(code: i16) -> Option<Self> {
+        if code >= 0 { None } else { unsafe { Some(Self(NonZeroI16::new_unchecked(code))) } }
     }
 
     /// Returns the raw error code.

@@ -1,6 +1,6 @@
 //! [`Timerfd`] associated types.
 use crate::fd::{AsFd, OwnedFd};
-use crate::sys::{SysRes, optmut};
+use crate::sys::{Error, arch, optmut};
 use crate::time::{Clock, ITimerspec};
 use crate::{fd, flags, sys};
 
@@ -15,7 +15,7 @@ fd::impl_fd_simple!(Timerfd);
 impl Timerfd {
     /// Creates new [`Timerfd`] (`timerfd_create(2)`).
     #[inline]
-    pub fn create(clock: Clock, flags: Flags) -> impl SysRes<Self> {
+    pub fn create(clock: Clock, flags: Flags) -> Result<Self, Error<arch::sys_timerfd_create>> {
         sys::call_rd!(sys_timerfd_create, i32::from(clock), flags.0)
     }
 
@@ -26,13 +26,16 @@ impl Timerfd {
         new: &ITimerspec,
         old: Option<&mut ITimerspec>,
         flags: TimerFlags,
-    ) -> impl SysRes<()> {
+    ) -> Result<(), Error<arch::sys_timerfd_settime>> {
         sys::call!(sys_timerfd_settime, self.as_raw_fd(), flags.0, new, optmut(old))
     }
 
     /// Returns the current timer (`timerfd_gettime(2)`).
     #[inline]
-    pub fn get_time(&self, curr_value: &mut ITimerspec) -> impl SysRes<()> {
+    pub fn get_time(
+        &self,
+        curr_value: &mut ITimerspec,
+    ) -> Result<(), Error<arch::sys_timerfd_gettime>> {
         sys::call!(sys_timerfd_gettime, self.as_raw_fd(), curr_value)
     }
 }

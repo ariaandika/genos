@@ -55,7 +55,6 @@ pub mod sys;
 
 // ===== standards =====
 
-pub mod error;
 pub mod fd;
 pub mod ffi;
 pub mod flags;

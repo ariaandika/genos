@@ -1,7 +1,7 @@
 use crate::fd::AsFd;
 use crate::ffi::Off;
 use crate::io::IoVecMut;
-use crate::sys::SysRes;
+use crate::sys::{Error, arch};
 use crate::{flags, sys};
 
 /// Copies data between one file descriptor and another (`sendfile(2)`).
@@ -11,7 +11,7 @@ pub fn sendfile<O: AsFd + ?Sized, I: AsFd + ?Sized>(
     in_fd: &I,
     offset: Option<&mut Off>,
     count: usize,
-) -> impl SysRes<usize> {
+) -> Result<usize, Error<arch::sys_sendfile64>> {
     let offset = sys::optmut(offset);
     sys::call!(sys_sendfile64, out_fd.as_raw_fd(), in_fd.as_raw_fd(), offset, count)
 }
@@ -25,7 +25,7 @@ pub fn splice<I: AsFd + ?Sized, O: AsFd + ?Sized>(
     off_out: Option<&mut Off>,
     size: usize,
     flags: SpliceFlags,
-) -> impl SysRes<usize> {
+) -> Result<usize, Error<arch::sys_splice>> {
     let off_in = sys::optmut(off_in);
     let off_out = sys::optmut(off_out);
     sys::call!(sys_splice, fd_in.as_raw_fd(), off_in, fd_out.as_raw_fd(), off_out, size, flags.0)
@@ -33,20 +33,22 @@ pub fn splice<I: AsFd + ?Sized, O: AsFd + ?Sized>(
 
 /// Duplicate pipe content (`tee(2)`).
 #[inline]
-pub fn tee<I, O>(fd_in: &I, fd_out: &O, size: usize, flags: SpliceFlags) -> impl SysRes<usize>
-where
-    I: AsFd + ?Sized,
-    O: AsFd + ?Sized,
-{
+pub fn tee<I: AsFd + ?Sized, O: AsFd + ?Sized>(
+    fd_in: &I,
+    fd_out: &O,
+    size: usize,
+    flags: SpliceFlags,
+) -> Result<usize, Error<arch::sys_tee>> {
     sys::call_rd!(sys_tee, fd_in.as_raw_fd(), fd_out.as_raw_fd(), size, flags.0)
 }
 
 /// Splice user pages to/from a pipe (`vmsplice(2)`).
 #[inline]
-pub fn vmsplice<Fd>(fd: &Fd, iov: &[IoVecMut<'_>], flags: SpliceFlags) -> impl SysRes<usize>
-where
-    Fd: AsFd + ?Sized,
-{
+pub fn vmsplice<Fd: AsFd + ?Sized>(
+    fd: &Fd,
+    iov: &[IoVecMut<'_>],
+    flags: SpliceFlags,
+) -> Result<usize, Error<arch::sys_vmsplice>> {
     sys::call!(sys_vmsplice, fd.as_raw_fd(), iov.as_ptr(), iov.len(), flags.0)
 }
 

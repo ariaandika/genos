@@ -3,7 +3,7 @@ use core::mem::MaybeUninit;
 
 use crate::ffi::Char;
 use crate::flags;
-use crate::sys::{self, SysRes};
+use crate::sys::{self, Error, arch};
 use crate::time::Timespec;
 
 // ===== Clock =====
@@ -35,24 +35,30 @@ impl Clock {
 }
 
 impl Clock {
-    /// Symbol name for [`Clock::time`] exported by vDSO.
+    /// Symbol name for [`Clock::get_time`] exported by vDSO.
     pub const GETTIME_VDSO_SYM: &Char = Char::new(c"__vdso_clock_gettime");
 
     /// Finds the resolution (precision) of this clock (`clock_getres(2)`).
     #[inline]
-    pub fn get_res(self, res: &mut MaybeUninit<Timespec>) -> impl SysRes<()> {
+    pub fn get_res(
+        self,
+        res: &mut MaybeUninit<Timespec>,
+    ) -> Result<(), Error<arch::sys_clock_getres>> {
         sys::call!(sys_clock_getres, self.0, res)
     }
 
     /// Retrieve the time of this clock (`clock_gettime(2)`).
     #[inline]
-    pub fn get_time(self, tp: &mut MaybeUninit<Timespec>) -> impl SysRes<()> {
+    pub fn get_time(
+        self,
+        tp: &mut MaybeUninit<Timespec>,
+    ) -> Result<(), Error<arch::sys_clock_gettime>> {
         sys::call!(sys_clock_gettime, self.0, tp)
     }
 
     /// Set the time of this clock (`clock_settime(2)`).
     #[inline]
-    pub fn set_time(self, tp: &Timespec) -> impl SysRes<()> {
+    pub fn set_time(self, tp: &Timespec) -> Result<(), Error<arch::sys_clock_settime>> {
         sys::call_rd!(sys_clock_settime, self.0, tp)
     }
 
@@ -63,7 +69,7 @@ impl Clock {
         flags: Flags,
         t: &Timespec,
         remain: Option<&mut Timespec>,
-    ) -> impl SysRes<()> {
+    ) -> Result<(), Error<arch::sys_clock_nanosleep>> {
         sys::call!(sys_clock_nanosleep, flags.0, t, sys::optmut(remain))
     }
 }

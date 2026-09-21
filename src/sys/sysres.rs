@@ -1,71 +1,80 @@
 use core::marker::PhantomData;
-use core::{ffi, num, ptr};
+use core::{error, ffi, fmt, num, ptr};
 
-use crate::error::ErrCode;
 use crate::fd::FromRawFd;
+use crate::sys::ErrCode;
+
+// ===== SysRaw =====
 
 /// Raw systemcall return value.
 pub type SysRaw = ffi::c_long;
 
-// ===== SysRes =====
+// ===== SysId =====
 
-/// System call result.
-pub trait SysRes<T>: sealed::SealedRes<T> + Sized {
-    /// The syscall name.
-    const NAME: &str = <Self as sealed::SealedRes<T>>::INNER_NAME;
-
-    /// Returns the raw syscall return value.
-    #[inline]
-    fn into_raw(self) -> SysRaw {
-        self.raw()
-    }
-
-    /// Checks for error and returns [`Result<T, ErrCode>`].
-    #[inline]
-    fn rescode(self) -> Result<T, ErrCode> {
-        let raw = self.raw();
-        if raw >= 0 {
-            Ok(Self::ok_from_raw(raw))
-        } else {
-            // SAFETY: `raw < 0`
-            unsafe { Err(ErrCode::new(raw as _)) }
-        }
-    }
-
-    /// Checks for error and returns [`Result<T, E>`].
-    ///
-    /// The custom error needs to implement [`FromSysErr`].
-    #[inline]
-    fn result<E: FromSysErr<Self::Sysno>>(self) -> Result<T, E> {
-        self.rescode().map_err(E::from_syserr)
-    }
-
-    /// Returns the success value.
-    ///
-    /// Panics if the result is an error code.
-    #[inline]
-    #[expect(clippy::panic, reason = "this will cover all panic use cases")]
-    fn unwrap(self) -> T {
-        let res = self.raw();
-        if res < 0 {
-            panic!("`{}` call returns {}", Self::NAME, res)
-        }
-        Self::ok_from_raw(res)
-    }
-}
-
-// ===== SysErr =====
-
-/// Systemcall number.
-pub trait SysErr {
+/// Systemcall identifier.
+pub trait SysId {
+    /// Systemcall number.
+    const NO: SysRaw;
     /// Systemcall name.
     const NAME: &str;
 }
 
-/// An error that can be created from [`SysErr`] and [`ErrCode`].
-pub trait FromSysErr<S: SysErr> {
-    /// Create self from [`SysErr`] and [`ErrCode`].
-    fn from_syserr(code: ErrCode) -> Self;
+// ===== Error =====
+
+/// System call [`Error`] implementation.
+///
+/// [`Error`]: core::error::Error
+pub struct Error<Id> {
+    code: ErrCode,
+    _id: PhantomData<Id>,
+}
+
+impl<Id> Error<Id> {
+    pub(crate) fn from_raw<T>(raw: SysRaw) -> Result<T, Self>
+    where
+        T: SysOk,
+    {
+        match ErrCode::from_sys(raw as _) {
+            None => Ok(T::from_raw(raw)),
+            Some(code) => Err(Self { code, _id: PhantomData }),
+        }
+    }
+
+    pub(crate) unsafe fn from_infallible(raw: SysRaw) -> Self {
+        Self { code: unsafe { ErrCode::new(raw as _) }, _id: PhantomData }
+    }
+
+    /// Returns the [`SysId::NAME`].
+    #[inline]
+    pub const fn syscall_name(&self) -> &'static str
+    where
+        Id: SysId,
+    {
+        Id::NAME
+    }
+
+    /// Returns the [`ErrCode`].
+    #[inline]
+    pub const fn code(&self) -> ErrCode {
+        self.code
+    }
+}
+
+impl<Id: SysId> error::Error for Error<Id> {}
+
+impl<Id: SysId> fmt::Debug for Error<Id> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("Error")
+            .field("code", &self.code)
+            .field("syscall", &Id::NAME)
+            .finish()
+    }
+}
+
+impl<Id: SysId> fmt::Display for Error<Id> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "`{}` returns -{}", Id::NAME, self.code.code())
+    }
 }
 
 // ===== SysOk =====
@@ -112,59 +121,5 @@ impl<T: FromRawFd> SysOk for T {
     #[inline]
     fn from_raw(raw: SysRaw) -> Self {
         unsafe { T::from_raw_fd(raw as i32) }
-    }
-}
-
-// ===== sealed =====
-
-mod sealed {
-    use super::SysRaw;
-    pub trait SealedRes<T> {
-        type Sysno: super::SysErr;
-        const INNER_NAME: &str;
-        fn raw(self) -> SysRaw;
-        fn ok_from_raw(raw: SysRaw) -> T;
-    }
-}
-
-// ===== SysResRaw =====
-
-/// System call result.
-#[derive(Debug)]
-#[repr(transparent)]
-#[must_use]
-pub struct SysResRaw<T, E> {
-    raw: SysRaw,
-    _t: PhantomData<T>,
-    _e: PhantomData<fn() -> E>,
-}
-
-impl<T, E> SysResRaw<T, E> {
-    pub(crate) fn drop(self) -> SysResRaw<(), E> {
-        SysResRaw { raw: self.raw, _t: PhantomData, _e: PhantomData }
-    }
-
-    pub(crate) fn map<U: SysOk, F: FnOnce(SysRaw) -> SysRaw>(self, f: F) -> SysResRaw<U, E> {
-        SysResRaw {
-            raw: if self.raw >= 0 { f(self.raw) } else { self.raw },
-            _t: PhantomData,
-            _e: PhantomData,
-        }
-    }
-}
-
-impl<T: SysOk, E: SysErr> SysRes<T> for SysResRaw<T, E> {}
-impl<T: SysOk, E: SysErr> sealed::SealedRes<T> for SysResRaw<T, E> {
-    type Sysno = E;
-    const INNER_NAME: &str = E::NAME;
-
-    #[inline]
-    fn raw(self) -> SysRaw {
-        self.raw
-    }
-
-    #[inline]
-    fn ok_from_raw(raw: SysRaw) -> T {
-        T::from_raw(raw)
     }
 }

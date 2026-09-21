@@ -1,20 +1,23 @@
 use core::ffi;
 
 use crate::ffi::{Char, Time};
-use crate::sys::{self, SysRes};
+use crate::sys::{self, Error, arch};
 
 /// Symbol name for [`time`] exported by vDSO.
 pub const TIME_VDSO_SYM: &Char = Char::new(c"__vdso_time");
 
 /// Get time in seconds since Epoch, `1970-01-01 00:00:00 +0000 (UTC)` (`time(2)`).
 #[inline]
-pub fn time(tloc: Option<&mut Time>) -> impl SysRes<Time> {
+pub fn time(tloc: Option<&mut Time>) -> Result<Time, Error<arch::sys_time>> {
     sys::call!(sys_time, sys::optmut(tloc))
 }
 
 /// High-resolution sleep (`nanosleep(2)`).
 #[inline]
-pub fn nanosleep(duration: &Timespec, rem: Option<&mut Timespec>) -> impl SysRes<()> {
+pub fn nanosleep(
+    duration: &Timespec,
+    rem: Option<&mut Timespec>,
+) -> Result<(), Error<arch::sys_nanosleep>> {
     sys::call!(sys_nanosleep, duration, sys::optmut(rem))
 }
 

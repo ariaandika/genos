@@ -1,7 +1,7 @@
 //! [`Memfd`] associated types.
 use crate::fd::{self, OwnedFd};
 use crate::ffi::Char;
-use crate::sys::SysRes;
+use crate::sys::{Error, arch};
 use crate::{flags, sys};
 
 // ===== Memfd =====
@@ -15,7 +15,7 @@ fd::impl_fd_simple!(Memfd);
 impl Memfd {
     /// Creates new [`Memfd`] (`memfd_create(2)`).
     #[inline]
-    pub fn create(name: &Char, flags: Flags) -> impl SysRes<Self> {
+    pub fn create(name: &Char, flags: Flags) -> Result<Self, Error<arch::sys_memfd_create>> {
         sys::call_rd!(sys_memfd_create, name, flags.0)
     }
 }

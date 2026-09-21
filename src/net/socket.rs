@@ -5,7 +5,7 @@ use crate::fd::{AsFd, OwnedFd};
 use crate::net::addr::{Family, SockAddr};
 use crate::net::msg::{MsgHdr, MsgHdrMut};
 use crate::net::raw::{self, Socklen};
-use crate::sys::SysRes;
+use crate::sys::{Error, arch};
 use crate::{fd, flags, sys};
 
 // ===== Socket =====
@@ -19,7 +19,7 @@ fd::impl_fd_simple!(Socket);
 impl Socket {
     /// Creates new [`Socket`] (`socket(2)`).
     #[inline]
-    pub fn create(domain: Family, ty: Type, flags: Flags) -> impl SysRes<Self> {
+    pub fn create(domain: Family, ty: Type, flags: Flags) -> Result<Self, Error<arch::sys_socket>> {
         sys::call_rd!(sys_socket, i32::from(domain), ty.0 | flags.0, 0)
     }
 
@@ -27,43 +27,55 @@ impl Socket {
     ///
     /// This is a helper method to create socket with [`Family::UNIX`] and [`Socket::STREAM`].
     #[inline]
-    pub fn unix_stream(flags: Flags) -> impl SysRes<Self> {
+    pub fn unix_stream(flags: Flags) -> Result<Self, Error<arch::sys_socket>> {
         Self::create(Family::UNIX, Self::STREAM, flags)
     }
 
     /// Bind address to this socket (`bind(2)`).
     #[inline]
-    pub fn bind(&self, addr: &SockAddr, addrlen: Socklen) -> impl SysRes<()> {
+    pub fn bind(&self, addr: &SockAddr, addrlen: Socklen) -> Result<(), Error<arch::sys_bind>> {
         sys::call_rd!(sys_bind, self.as_raw_fd(), addr, addrlen)
     }
 
     /// Initiate a connection on this socket (`connect(2)`).
     #[inline]
-    pub fn connect(&self, addr: &SockAddr, addrlen: Socklen) -> impl SysRes<()> {
+    pub fn connect(
+        &self,
+        addr: &SockAddr,
+        addrlen: Socklen,
+    ) -> Result<(), Error<arch::sys_connect>> {
         sys::call_rd!(sys_connect, self.as_raw_fd(), addr, addrlen)
     }
 
     /// Returns this socket address (`getsockname(2)`).
     #[inline]
-    pub fn addr(&self, addr: &mut SockAddr, addrlen: &mut Socklen) -> impl SysRes<()> {
+    pub fn addr(
+        &self,
+        addr: &mut SockAddr,
+        addrlen: &mut Socklen,
+    ) -> Result<(), Error<arch::sys_getsockname>> {
         sys::call!(sys_getsockname, self.as_raw_fd(), addr, addrlen)
     }
 
     /// Returns the peer socket address (`getpeername(2)`).
     #[inline]
-    pub fn peer_addr(&self, addr: &mut SockAddr, addrlen: &mut Socklen) -> impl SysRes<()> {
+    pub fn peer_addr(
+        &self,
+        addr: &mut SockAddr,
+        addrlen: &mut Socklen,
+    ) -> Result<(), Error<arch::sys_getpeername>> {
         sys::call!(sys_getpeername, self.as_raw_fd(), addr, addrlen)
     }
 
     /// Listen for connections on this socket (`listen(2)`).
     #[inline]
-    pub fn listen(&self, backlog: i32) -> impl SysRes<()> {
+    pub fn listen(&self, backlog: i32) -> Result<(), Error<arch::sys_listen>> {
         sys::call_rd!(sys_listen, self.as_raw_fd(), backlog)
     }
 
     /// Shut down part of a full-duplex connection (`shutdown(2)`).
     #[inline]
-    pub fn shutdown(&self, how: Shutdown) -> impl SysRes<()> {
+    pub fn shutdown(&self, how: Shutdown) -> Result<(), Error<arch::sys_shutdown>> {
         sys::call_rd!(sys_shutdown, self.as_raw_fd(), how.0)
     }
 }
@@ -71,25 +83,37 @@ impl Socket {
 impl Socket {
     /// Send message on this fd (`sendto(2)`).
     #[inline]
-    pub fn send(&self, buf: &[u8], flags: MsgFlags) -> impl SysRes<usize> {
+    pub fn send(&self, buf: &[u8], flags: MsgFlags) -> Result<usize, Error<arch::sys_sendto>> {
         sys::call_rd!(sys_sendto, self.as_raw_fd(), buf.as_ptr(), buf.len(), flags.0, 0, 0)
     }
 
     /// Send message on this fd (`sendmsg(2)`).
     #[inline]
-    pub fn sendmsg(&self, msg: &MsgHdr, flags: MsgFlags) -> impl SysRes<usize> {
+    pub fn sendmsg(
+        &self,
+        msg: &MsgHdr,
+        flags: MsgFlags,
+    ) -> Result<usize, Error<arch::sys_sendmsg>> {
         sys::call_rd!(sys_sendmsg, self.as_raw_fd(), msg, flags.0)
     }
 
     /// Receive message from this fd (`recvfrom(2)`).
     #[inline]
-    pub fn recv(&self, buf: &mut [MaybeUninit<u8>], flags: MsgFlags) -> impl SysRes<usize> {
+    pub fn recv(
+        &self,
+        buf: &mut [MaybeUninit<u8>],
+        flags: MsgFlags,
+    ) -> Result<usize, Error<arch::sys_recvfrom>> {
         sys::call!(sys_recvfrom, self.as_raw_fd(), buf.as_mut_ptr(), buf.len(), flags.0, 0, 0)
     }
 
     /// Receive message from this fd (`recvmsg(2)`).
     #[inline]
-    pub fn recvmsg(&self, msg: &mut MsgHdrMut, flags: MsgFlags) -> impl SysRes<usize> {
+    pub fn recvmsg(
+        &self,
+        msg: &mut MsgHdrMut,
+        flags: MsgFlags,
+    ) -> Result<usize, Error<arch::sys_recvmsg>> {
         sys::call!(sys_recvmsg, self.as_raw_fd(), msg, flags.0)
     }
 
@@ -100,7 +124,7 @@ impl Socket {
         addr: Option<&mut SockAddr>,
         addrlen: Option<&mut Socklen>,
         flags: Flags,
-    ) -> impl SysRes<Self> {
+    ) -> Result<Self, Error<arch::sys_accept4>> {
         let addr = sys::optmut(addr);
         let addrlen = sys::optmut(addrlen);
         sys::call_rd!(sys_accept4, self.as_raw_fd(), addr, addrlen, flags.0)

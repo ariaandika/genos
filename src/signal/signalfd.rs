@@ -1,10 +1,8 @@
 //! [`Signalfd`] associated types.
-use core::mem::MaybeUninit;
-
-use crate::fd::{AsFd, OwnedFd};
+use crate::fd::{AsFd, FromRawFd, OwnedFd};
 use crate::signal::{Signo, Sigset};
-use crate::sys::{SysRes, SysResRaw, arch};
-use crate::{fd, flags, io, sys};
+use crate::sys::{Error, arch};
+use crate::{fd, flags, sys};
 
 // ===== Signalfd =====
 
@@ -17,27 +15,18 @@ fd::impl_fd_simple!(Signalfd);
 impl Signalfd {
     /// Create new [`Signalfd`] (`signalfd(2)`).
     #[inline]
-    pub fn create(sigset: &Sigset, flags: Flags) -> impl SysRes<Self> {
-        signalfd(-1, sigset, flags)
+    pub fn create(sigset: &Sigset, flags: Flags) -> Result<Self, Error<arch::sys_signalfd4>> {
+        signalfd(-1, sigset, flags).map(|fd| unsafe { <_>::from_raw_fd(fd) })
     }
 
     /// Replace the associated signal set (`signalfd(2)`).
     #[inline]
-    pub fn set_signal(&self, sigset: &Sigset) -> impl SysRes<()> {
-        signalfd(self.as_raw_fd(), sigset, <_>::default())
-    }
-
-    /// Read and consume caught pending signals.
-    ///
-    /// Returns the number of `Siginfo` struct returned.
-    #[inline]
-    pub fn read(&self, buf: &mut [MaybeUninit<Siginfo>]) -> impl SysRes<usize> {
-        io::read_raw(self.as_raw_fd(), buf.as_mut_ptr(), size_of_val(buf))
-            .map(|read| (read as usize).wrapping_div(size_of::<Siginfo>()) as _)
+    pub fn set_signal(&self, sigset: &Sigset) -> Result<(), Error<arch::sys_signalfd4>> {
+        signalfd(self.as_raw_fd(), sigset, <_>::default()).map(drop)
     }
 }
 
-fn signalfd<T>(fd: i32, sigset: &Sigset, flags: Flags) -> SysResRaw<T, arch::sys_signalfd4> {
+fn signalfd(fd: i32, sigset: &Sigset, flags: Flags) -> Result<i32, Error<arch::sys_signalfd4>> {
     sys::call_rd!(sys_signalfd4, fd, sigset.as_ref(), flags.0)
 }
 

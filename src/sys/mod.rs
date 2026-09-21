@@ -1,9 +1,10 @@
 //! System calls primitives.
-pub(crate) use arch::{call, call_rd};
-pub(crate) use sysres::SysResRaw;
+pub(crate) use arch::{call, call_rd, call_rd_raw};
 
-pub use sysres::{FromSysErr, SysErr, SysRaw, SysRes};
+pub use code::ErrCode;
+pub use sysres::{Error, SysId, SysRaw};
 
+mod code;
 mod sysres;
 
 // ===== architecture =====

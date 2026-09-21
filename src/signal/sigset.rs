@@ -2,7 +2,9 @@ use core::mem::MaybeUninit;
 use core::{ffi, mem};
 
 use crate::signal::Signo;
-use crate::sys::{self, SysRes, optmut};
+use crate::sys::{self, Error, arch, optmut};
+
+pub type SigProcResult<T> = Result<T, Error<arch::sys_rt_sigprocmask>>;
 
 // ===== Sigset =====
 
@@ -60,7 +62,7 @@ impl Sigset {
     pub fn new_current() -> Self {
         let mut me = MaybeUninit::uninit();
         // possible errors are EFAULT and EINVAL
-        rt_sigprocmask(Self::ZERO, None, Some(&mut me));
+        let _ = rt_sigprocmask(Self::ZERO, None, Some(&mut me));
         unsafe { me.assume_init() }
     }
 
@@ -68,24 +70,24 @@ impl Sigset {
     #[inline]
     pub fn current(&mut self) {
         // possible errors are EFAULT and EINVAL
-        rt_sigprocmask(Self::ZERO, None, optuninit(Some(self)));
+        let _ = rt_sigprocmask(Self::ZERO, None, optuninit(Some(self)));
     }
 
     /// Set the blocked signals to the union of the current set and this set.
     #[inline]
-    pub fn block(&self) -> impl SysRes<()> {
+    pub fn block(&self) -> SigProcResult<()> {
         rt_sigprocmask(Self::BLOCK, Some(self), None)
     }
 
     /// Remove the blocked signals that is in this set.
     #[inline]
-    pub fn unblock(&self) -> impl SysRes<()> {
+    pub fn unblock(&self) -> SigProcResult<()> {
         rt_sigprocmask(Self::UNBLOCK, Some(self), None)
     }
 
     /// Set the blocked signals to this set.
     #[inline]
-    pub fn setmask(&self) -> impl SysRes<()> {
+    pub fn setmask(&self) -> SigProcResult<()> {
         rt_sigprocmask(Self::SETMASK, Some(self), None)
     }
 }
@@ -105,7 +107,7 @@ pub fn rt_sigprocmask(
     how: SigHow,
     new: Option<&Sigset>,
     old: Option<&mut MaybeUninit<Sigset>>,
-) -> impl SysRes<()> {
+) -> SigProcResult<()> {
     sys::call!(sys_rt_sigprocmask, how.0, optref(new), optmut(old), size_of::<Sigset>())
 }
 
