@@ -20,14 +20,15 @@ impl Epoll {
         sys::call_rd!(sys_epoll_create1, flags.0)
     }
 
+    /// Add, modify, or remove entries in the interest list (`epoll_ctl(2)`).
     #[inline]
-    fn epoll_ctl<Fd: AsFd + ?Sized>(
+    pub fn ctl<Fd: AsFd + ?Sized>(
         &self,
-        op: i32,
+        op: Ctl,
         fd: &Fd,
-        ev: *const Event,
+        ev: Option<&Event>,
     ) -> Result<(), Error<arch::sys_epoll_ctl>> {
-        sys::call_rd!(sys_epoll_ctl, self.as_raw_fd(), op, fd.as_raw_fd(), ev)
+        sys::call_rd!(sys_epoll_ctl, self.as_raw_fd(), op.0, fd.as_raw_fd(), optref(ev))
     }
 
     /// Waits for events `epoll_wait(2)`.
@@ -52,7 +53,7 @@ impl Epoll {
         events: EventType,
         data: u64,
     ) -> Result<(), Error<arch::sys_epoll_ctl>> {
-        self.epoll_ctl(EPOLL_CTL_ADD, fd, &Event { events, data })
+        self.ctl(Self::CTL_ADD, fd, Some(&Event { events, data }))
     }
 
     /// Change the settings associated with fd in the interest list (`epoll_ctl(2)`).
@@ -68,13 +69,13 @@ impl Epoll {
     where
         Fd: AsFd + ?Sized,
     {
-        self.epoll_ctl(EPOLL_CTL_MOD, fd, &Event { events, data })
+        self.ctl(Self::CTL_MOD, fd, Some(&Event { events, data }))
     }
 
     /// Remove (deregister) the target fd from the interest list (`epoll_ctl(2)`).
     #[inline]
     pub fn delete<Fd: AsFd + ?Sized>(&self, fd: &Fd) -> Result<(), Error<arch::sys_epoll_ctl>> {
-        self.epoll_ctl(EPOLL_CTL_DEL, fd, 0 as _)
+        self.ctl(Self::CTL_DEL, fd, None)
     }
 }
 
@@ -102,6 +103,22 @@ flags::impl_bitops_simple!(Flags);
 impl Epoll {
     /// `EPOLL_CLOEXEC`
     pub const CLOEXEC: Flags = Flags(EPOLL_CLOEXEC);
+}
+
+// ===== Ctl =====
+
+/// [`Epoll::ctl`] operation.
+#[derive(Debug, Clone, Copy)]
+#[repr(transparent)]
+pub struct Ctl(i32);
+
+impl Epoll {
+    /// `EPOLL_CTL_ADD`
+    pub const CTL_ADD: Ctl = Ctl(EPOLL_CTL_ADD);
+    /// `EPOLL_CTL_DEL`
+    pub const CTL_DEL: Ctl = Ctl(EPOLL_CTL_DEL);
+    /// `EPOLL_CTL_MOD`
+    pub const CTL_MOD: Ctl = Ctl(EPOLL_CTL_MOD);
 }
 
 // ===== EventType =====
@@ -151,6 +168,11 @@ impl Epoll {
 }
 
 // ===== extern =====
+
+fn optref(opt: Option<&Event>) -> *const Event {
+    // this will generate to just a `mov`
+    opt.map_or(core::ptr::null(), |e|e as *const _)
+}
 
 // include/uapi/linux/eventpoll.h
 
