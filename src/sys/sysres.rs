@@ -34,7 +34,7 @@ impl<Id> Error<Id> {
     where
         T: SysOk,
     {
-        match ErrCode::from_sys(raw as _) {
+        match ErrCode::from_sys(raw) {
             None => Ok(T::from_raw(raw)),
             Some(code) => Err(Self { code, _id: PhantomData }),
         }

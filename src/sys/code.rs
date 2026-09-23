@@ -1,6 +1,8 @@
 use core::fmt;
 use core::num::NonZeroI16;
 
+use crate::sys::SysRaw;
+
 // ===== ErrCode =====
 
 /// Error Code.
@@ -16,8 +18,8 @@ impl ErrCode {
         unsafe { Self(NonZeroI16::new_unchecked(code)) }
     }
 
-    pub(crate) const fn from_sys(code: i16) -> Option<Self> {
-        if code >= 0 { None } else { unsafe { Some(Self(NonZeroI16::new_unchecked(code))) } }
+    pub(crate) const fn from_sys(code: SysRaw) -> Option<Self> {
+        if code >= 0 { None } else { unsafe { Some(Self(NonZeroI16::new_unchecked(code as _))) } }
     }
 
     /// Returns the raw error code.
