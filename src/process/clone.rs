@@ -45,7 +45,7 @@ pub unsafe fn clone(
             in("r9") tls,
             lateout("rcx") _,
             lateout("r11") _,
-            options(nostack, preserves_flags),
+            options(nostack),
         );
         Error::from_raw(ret)
     }
@@ -83,7 +83,7 @@ pub unsafe fn clone3(args: *const CloneArgs, size: usize) -> Result<(), Error<ar
             in("rsi") size,
             lateout("rcx") _,
             lateout("r11") _,
-            options(nostack, preserves_flags),
+            options(nostack),
         );
         Error::from_raw(ret)
     }
