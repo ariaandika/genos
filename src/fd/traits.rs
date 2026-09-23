@@ -64,7 +64,7 @@ impl AsFd for BorrowedFd<'_> {
 impl AsFd for OwnedFd {
     #[inline]
     fn as_fd(&self) -> BorrowedFd<'_> {
-        unsafe { BorrowedFd::borrow_raw(self.as_raw_fd()) }
+        unsafe { BorrowedFd::borrow_raw(self.raw()) }
     }
 }
 
