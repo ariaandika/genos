@@ -1,8 +1,8 @@
 //! UNIX socket address.
-use core::{ffi, fmt, marker, mem};
+use core::{ffi, fmt, marker};
 
 use crate::ffi::Char;
-use crate::net::addr::{AddrError, Family, SockAddr};
+use crate::net::addr::{Family, SockAddr};
 use crate::net::cmsg::{CMsgKind, CMsgType};
 use crate::net::raw::Socklen;
 use crate::net::{SaFamily, raw};
@@ -17,27 +17,28 @@ pub struct SockAddrUn {
 }
 
 impl SockAddrUn {
+    /// The maximum length of the address path.
+    pub const PATH_MAX: usize = raw::UNIX_PATH_MAX;
+
     /// Creates [`SockAddrUn`] with given path.
     ///
-    /// # Errors
-    ///
-    /// Returns error if path is too long. UNIX domain address path musst be less than 108 including
-    /// the null termination byte.
+    /// If the path is longer than [`SockAddrUn::PATH_MAX`], it is silently truncated.
     #[inline]
-    pub const fn from_path(path: &Char) -> Result<Self, AddrError> {
-        let mut addr = unsafe { mem::zeroed::<Self>() };
-        addr.sun_family = Family::UNIX.sa_family();
-
-        if strlen(path) > const { raw::UNIX_PATH_MAX - 1 } {
-            return Err(AddrError::ExcessivePath);
+    pub const fn from_path(path: &Char) -> Self {
+        let mut sun_path = [0; _];
+        let mut n = 0;
+        while n < const { Self::PATH_MAX - 1 } {
+            unsafe {
+                let byte = *path.as_ptr().add(n);
+                if byte == 0 {
+                    break;
+                }
+                sun_path.as_mut_ptr().add(n).write(byte);
+                n += 1;
+            }
         }
 
-        unsafe {
-            addr.sun_path
-                .as_mut_ptr()
-                .copy_from_nonoverlapping(path.as_ptr(), raw::UNIX_PATH_MAX);
-        };
-        Ok(addr)
+        Self { sun_family: Family::UNIX.sa_family(), sun_path }
     }
 
     /// Cast to generic [`SockAddr`]
@@ -57,7 +58,7 @@ impl SockAddrUn {
     ///
     /// Returns [`None`] if the address is unnamed or abstract.
     #[inline]
-    pub fn as_pathname(&self) -> Option<&Char> {
+    pub const fn as_pathname(&self) -> Option<&Char> {
         if self.sun_path[0] == 0 {
             return None;
         }
@@ -106,12 +107,4 @@ impl CMsgKind for SCMRights {
     type Data = i32;
 
     const TYPE: CMsgType = CMsgType::RIGHTS;
-}
-
-const fn strlen(str: &Char) -> usize {
-    let mut n = 0;
-    while unsafe { *str.as_ptr().add(n) != 0 } {
-        n += 1;
-    }
-    n
 }

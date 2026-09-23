@@ -1,5 +1,5 @@
 //! Socket address.
-use core::{error, ffi, fmt};
+use core::ffi;
 
 use crate::net::{SaFamily, raw};
 
@@ -17,9 +17,7 @@ pub struct SockAddr {
 
 // ===== Family =====
 
-/// Socket address family.
-///
-/// For more details, see `address_families(7)`.
+/// Socket address family (`address_families(7)`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(transparent)]
 pub struct Family(i32);
@@ -43,28 +41,5 @@ impl From<Family> for i32 {
     #[inline]
     fn from(value: Family) -> Self {
         value.0
-    }
-}
-
-// ===== SockAddrError =====
-
-/// An error that occur when validating socket address.
-#[derive(Debug, Clone, Copy)]
-pub enum AddrError {
-    /// Address path length exceeds maximum capacity.
-    ExcessivePath,
-    /// Family in generic socket address does not match.
-    MissmatchFamily,
-}
-
-impl error::Error for AddrError {}
-
-impl fmt::Display for AddrError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let msg = match self {
-            Self::ExcessivePath => "excessive path length",
-            Self::MissmatchFamily => "missmatch socket family name",
-        };
-        msg.fmt(f)
     }
 }
