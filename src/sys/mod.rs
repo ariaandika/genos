@@ -1,5 +1,5 @@
 //! System calls primitives.
-pub(crate) use arch::{call, call_rd, call_rd_raw};
+pub(crate) use arch::{call, call_impl, call_rd, call_rd_raw};
 
 pub use code::ErrCode;
 pub use sysres::{Error, SysId, SysRaw};

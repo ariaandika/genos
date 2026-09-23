@@ -96,12 +96,8 @@ pub(crate) unsafe fn call1_noret(nr: SysRaw, a1: i32) -> ! {
     }
 }
 
-/// Perform a syscall.
-///
-/// This is simple, function like macro, where the 1st argument is the syscall identifier, and the
-/// rest is the syscall arguments.
-macro_rules! call {
-    ($nr:ident $(=> $ret:ty)?
+macro_rules! call_impl {
+    ($nr:ident, [$($flags:ident),*], |$ret_v:ident$(: $ret_ty:ty)?| $map:expr
      $(, $a1:expr
      $(, $a2:expr
      $(, $a3:expr
@@ -111,10 +107,10 @@ macro_rules! call {
      )?)?)?)?)?)?
     ) => { unsafe {
         use crate::sys;
-        let ret;
+        let $ret_v $(: $ret_ty)?;
         core::arch::asm!(
             "syscall",
-            inlateout("rax") <sys::arch::$nr as sys::SysId>::NO => ret,
+            inlateout("rax") <sys::arch::$nr as sys::SysId>::NO => $ret_v,
             $(in("rdi") $a1,
             $(in("rsi") $a2,
             $(in("rdx") $a3,
@@ -124,10 +120,20 @@ macro_rules! call {
             )?)?)?)?)?)?
             lateout("rcx") _,
             lateout("r11") _,
-            options(nostack, preserves_flags)
+            options(nostack, preserves_flags $(, $flags)*)
         );
-        sys::Error::<sys::arch::$nr>::from_raw(ret)
+        $map
     } };
+}
+
+/// Perform a syscall.
+///
+/// This is simple, function like macro, where the 1st argument is the syscall identifier, and the
+/// rest is the syscall arguments.
+macro_rules! call {
+    ($nr:ident $($tt:tt)*) => {
+        sys::call_impl!($nr, [], |ret|sys::Error::<sys::arch::$nr>::from_raw(ret) $($tt)*)
+    };
 }
 
 /// Perform a readonly syscall.
@@ -137,32 +143,9 @@ macro_rules! call {
 ///
 /// In contrast with [`call!`], this syscall should not mutate userspace memory.
 macro_rules! call_rd {
-    ($nr:ident
-     $(, $a1:expr
-     $(, $a2:expr
-     $(, $a3:expr
-     $(, $a4:expr
-     $(, $a5:expr
-     $(, $a6:expr
-     )?)?)?)?)?)?
-    ) => { unsafe {
-        let ret;
-        core::arch::asm!(
-            "syscall",
-            inlateout("rax") <crate::sys::arch::$nr as crate::sys::SysId>::NO => ret,
-            $(in("rdi") $a1,
-            $(in("rsi") $a2,
-            $(in("rdx") $a3,
-            $(in("r10") $a4,
-            $(in("r8") $a5,
-            $(in("r9") $a6,
-            )?)?)?)?)?)?
-            lateout("rcx") _,
-            lateout("r11") _,
-            options(nostack, preserves_flags, readonly)
-        );
-        sys::Error::<sys::arch::$nr>::from_raw(ret)
-    } };
+    ($nr:ident $($tt:tt)*) => {
+        sys::call_impl!($nr, [readonly], |ret|sys::Error::<sys::arch::$nr>::from_raw(ret) $($tt)*)
+    };
 }
 
 /// Perform a syscall.
@@ -170,35 +153,12 @@ macro_rules! call_rd {
 /// This is simple, function like macro, where the 1st argument is the syscall identifier, and the
 /// rest is the syscall arguments.
 macro_rules! call_rd_raw {
-    ($nr:ident
-     $(, $a1:expr
-     $(, $a2:expr
-     $(, $a3:expr
-     $(, $a4:expr
-     $(, $a5:expr
-     $(, $a6:expr
-     )?)?)?)?)?)?
-    ) => { unsafe {
-        use crate::sys;
-        let ret: sys::SysRaw;
-        core::arch::asm!(
-            "syscall",
-            inlateout("rax") <sys::arch::$nr as sys::SysId>::NO => ret,
-            $(in("rdi") $a1,
-            $(in("rsi") $a2,
-            $(in("rdx") $a3,
-            $(in("r10") $a4,
-            $(in("r8") $a5,
-            $(in("r9") $a6,
-            )?)?)?)?)?)?
-            lateout("rcx") _,
-            lateout("r11") _,
-            options(nostack, preserves_flags, readonly)
-        );
-        ret
-    } };
+    ($nr:ident $($tt:tt)*) => {
+        sys::call_impl!($nr, [readonly], |ret:sys::SysRaw|ret $($tt)*)
+    };
 }
 
 pub(crate) use call;
+pub(crate) use call_impl;
 pub(crate) use call_rd;
 pub(crate) use call_rd_raw;
