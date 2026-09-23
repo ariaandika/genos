@@ -4,13 +4,12 @@ use core::{ffi, fmt, marker, mem};
 use crate::ffi::Char;
 use crate::net::addr::{AddrError, Family, SockAddr};
 use crate::net::cmsg::{CMsgKind, CMsgType};
+use crate::net::raw::Socklen;
 use crate::net::{SaFamily, raw};
 
 // ===== SockaddrUn =====
 
-/// UNIX domain socket address.
-///
-/// See `sockaddr_un(3type)`.
+/// UNIX domain socket address (`sockaddr_un(3type)`).
 #[repr(C)]
 pub struct SockAddrUn {
     sun_family: SaFamily,
@@ -46,6 +45,12 @@ impl SockAddrUn {
     pub const fn as_sockaddr(&self) -> &SockAddr {
         // SAFETY: SockAddr is a subset of SockAddrUn
         unsafe { &*(self as *const Self as *const SockAddr) }
+    }
+
+    /// Returns this struct size as [`Socklen`].
+    #[inline]
+    pub const fn addrlen(&self) -> Socklen {
+        size_of::<Self>() as Socklen
     }
 
     /// Returns the address as pathname.

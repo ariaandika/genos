@@ -16,6 +16,7 @@ pub mod cmsg;
 // net implementation
 
 pub mod unix;
+pub mod ip;
 
 // `socket(2)`
 
