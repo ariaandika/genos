@@ -43,6 +43,7 @@ impl<'a> From<&'a CStr> for &'a Char {
 impl core::fmt::Debug for Char {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         let mut c = self.as_ptr().cast::<u8>();
+        f.write_str("\"")?;
         loop {
             match unsafe { *c } {
                 0 => break,
@@ -51,6 +52,6 @@ impl core::fmt::Debug for Char {
             }
             c = unsafe { c.add(1) };
         }
-        Ok(())
+        f.write_str("\"")
     }
 }
