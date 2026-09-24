@@ -46,7 +46,7 @@ pub fn tee<I: AsFd + ?Sized, O: AsFd + ?Sized>(
 #[inline]
 pub fn vmsplice<Fd: AsFd + ?Sized>(
     fd: &Fd,
-    iov: &[IoVecMut<'_>],
+    iov: &mut [IoVecMut<'_>],
     flags: SpliceFlags,
 ) -> Result<usize, Error<arch::sys_vmsplice>> {
     sys::call!(sys_vmsplice, fd.as_raw_fd(), iov.as_ptr(), iov.len(), flags.0)

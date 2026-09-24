@@ -34,7 +34,7 @@ pub fn pread<Fd: AsFd + ?Sized>(
 
 /// Read bytes from this fd into given scattered buffer (`readv(2)`).
 #[inline]
-pub fn readv<Fd>(fd: &Fd, buf: &[IoVecMut<'_>]) -> Result<usize, Error<arch::sys_readv>>
+pub fn readv<Fd>(fd: &Fd, buf: &mut [IoVecMut<'_>]) -> Result<usize, Error<arch::sys_readv>>
 where
     Fd: AsFd + ?Sized,
 {
@@ -45,7 +45,7 @@ where
 #[inline]
 pub fn preadv<Fd: AsFd + ?Sized>(
     fd: &Fd,
-    buf: &[IoVecMut<'_>],
+    buf: &mut [IoVecMut<'_>],
     offset: Off,
     flags: RWFlags,
 ) -> Result<usize, Error<arch::sys_preadv2>> {
