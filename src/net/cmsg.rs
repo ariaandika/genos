@@ -1,6 +1,7 @@
 //! Socket control message.
 use core::{marker, mem};
 
+use crate::net::msg::MsgControl;
 use crate::net::raw;
 
 // ===== CMsgKind =====
@@ -21,8 +22,14 @@ pub trait CMsgKind {
 pub struct CMsgType(i32);
 
 impl CMsgType {
-    /// Send or receive a set of open file descriptors from another process.
+    /// `SCM_RIGHTS`
     pub const RIGHTS: Self = Self(raw::SCM_RIGHTS);
+    /// `SCM_CREDENTIALS`
+    pub const CREDENTIALS: Self = Self(raw::SCM_CREDENTIALS);
+    /// `SCM_SECURITY`
+    pub const SECURITY: Self = Self(raw::SCM_SECURITY);
+    /// `SCM_PIDFD`
+    pub const PIDFD: Self = Self(raw::SCM_PIDFD);
 }
 
 impl From<CMsgType> for i32 {

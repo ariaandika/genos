@@ -13,9 +13,9 @@ pub type Socklen = u32;
 pub type SaFamily = ffi::c_ushort;
 
 pub const SCM_RIGHTS: i32 = 0x01;
-// pub const SCM_CREDENTIALS: i32 = 0x02;
-// pub const SCM_SECURITY: i32 = 0x03;
-// pub const SCM_PIDFD: i32 = 0x04;
+pub const SCM_CREDENTIALS: i32 = 0x02;
+pub const SCM_SECURITY: i32 = 0x03;
+pub const SCM_PIDFD: i32 = 0x04;
 
 pub const AF_UNIX: i32 = 1;
 pub const AF_LOCAL: i32 = 1;
