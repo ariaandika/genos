@@ -1,7 +1,6 @@
 //! Socket control message.
-use core::{marker, mem};
+use core::{marker, mem, ops};
 
-use crate::net::msg::MsgControl;
 use crate::net::raw;
 
 // ===== CMsgKind =====
@@ -55,6 +54,27 @@ impl From<CMsgType> for i32 {
 // - size: size_of<cmsghdr>() + size_of<data>() + padding
 // - align: align_of<cmsghdr>().max(align_of<data>())
 
+/// Control message.
+#[derive(Debug)]
+#[repr(C)]
+pub struct CMsgHdr {
+    hdr: raw::cmsghdr,
+}
+
+impl CMsgHdr {
+    /// Returns initialized data size in bytes.
+    #[inline]
+    pub const fn data_size(&self) -> usize {
+        self.hdr.cmsg_len - raw::cmsg_align(size_of::<raw::cmsghdr>())
+    }
+
+    /// Returns control message type.
+    #[inline]
+    pub const fn ty(&self) -> CMsgType {
+        CMsgType(self.hdr.cmsg_type)
+    }
+}
+
 // ===== CMsgArray =====
 
 /// Control message array.
@@ -92,22 +112,22 @@ impl<T: CMsgKind + ?Sized, const N: usize> CMsgArray<T, N> {
         Self { hdr, data, _kind: marker::PhantomData }
     }
 
-    /// Cast to [`MsgControl`].
+    /// Returns count of the initialized data.
     #[inline]
-    pub const fn as_control(&self) -> &MsgControl {
+    pub const fn len(&self) -> usize {
+        self.as_hdr().data_size() / size_of::<T::Data>()
+    }
+
+    /// Cast to [`CMsgHdr`].
+    #[inline]
+    pub const fn as_hdr(&self) -> &CMsgHdr {
         unsafe { &*(self as *const _ as *const _) }
     }
 
-    /// Cast to [`MsgControl`].
+    /// Cast to [`CMsgHdr`].
     #[inline]
-    pub const fn as_mut_control(&mut self) -> &mut MsgControl {
+    pub const fn as_mut_hdr(&mut self) -> &mut CMsgHdr {
         unsafe { &mut *(self as *mut _ as *mut _) }
-    }
-
-    /// Returns length of the initialized data.
-    #[inline]
-    pub const fn len(&self) -> usize {
-        (self.hdr.cmsg_len - raw::cmsg_align(size_of::<raw::cmsghdr>())) / size_of::<T::Data>()
     }
 
     /// Returns the initialized data as slice.
@@ -115,5 +135,29 @@ impl<T: CMsgKind + ?Sized, const N: usize> CMsgArray<T, N> {
     pub fn data(&self) -> &[T::Data] {
         // SAFETY: the length is set since the constructor or by the kernel
         unsafe { self.data.get_unchecked(..self.len()).assume_init_ref() }
+    }
+
+    /// Returns the initialized data as slice.
+    #[inline]
+    pub fn data_mut(&mut self) -> &mut [T::Data] {
+        // SAFETY: the length is set since the constructor or by the kernel
+        let len = self.len();
+        unsafe { self.data.get_unchecked_mut(..len).assume_init_mut() }
+    }
+}
+
+impl<T: CMsgKind + ?Sized, const N: usize> ops::Deref for CMsgArray<T, N> {
+    type Target = CMsgHdr;
+
+    #[inline]
+    fn deref(&self) -> &Self::Target {
+        self.as_hdr()
+    }
+}
+
+impl<T: CMsgKind + ?Sized, const N: usize> ops::DerefMut for CMsgArray<T, N> {
+    #[inline]
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.as_mut_hdr()
     }
 }

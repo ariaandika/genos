@@ -4,6 +4,7 @@ use core::{fmt, marker, ptr};
 use crate::flags;
 use crate::io::{IoVec, IoVecMut};
 use crate::net::addr::SockAddr;
+use crate::net::cmsg::CMsgHdr;
 use crate::net::raw::{self, Socklen};
 
 macro_rules! new_hdr {
@@ -34,12 +35,12 @@ pub struct MsgHdr<'nm, 'io, 'ct> {
     msg_namelen: Socklen,
     msg_iov: *const IoVec<'io>,
     msg_iovlen: usize,
-    msg_control: *const MsgControl,
+    msg_control: *const CMsgHdr,
     msg_controllen: usize,
     msg_flags: i32,
     _n: marker::PhantomData<&'nm Socklen>,
     _o: marker::PhantomData<&'io [IoVec<'io>]>,
-    _c: marker::PhantomData<&'ct MsgControl>,
+    _c: marker::PhantomData<&'ct CMsgHdr>,
 }
 
 impl<'nm, 'io, 'ct> MsgHdr<'nm, 'io, 'ct> {
@@ -49,7 +50,7 @@ impl<'nm, 'io, 'ct> MsgHdr<'nm, 'io, 'ct> {
         name: &'nm SockAddr,
         namelen: Socklen,
         iov: &'io [IoVec<'io>],
-        control: &'ct MsgControl,
+        control: &'ct CMsgHdr,
         controllen: usize,
     ) -> Self {
         new_hdr!(name, namelen, iov.as_ptr(), iov.len(), control, controllen)
@@ -69,7 +70,7 @@ impl<'io, 'ct> MsgHdr<'static, 'io, 'ct> {
     #[inline]
     pub const fn new_cmsg(
         iov: &'io [IoVec<'io>],
-        control: &'ct MsgControl,
+        control: &'ct CMsgHdr,
         controllen: usize,
     ) -> Self {
         new_hdr!(ptr::null_mut(), 0, iov.as_ptr(), iov.len(), control, controllen)
@@ -107,12 +108,12 @@ pub struct MsgHdrMut<'nm, 'io, 'ct> {
     msg_namelen: Socklen,
     msg_iov: *mut IoVecMut<'io>,
     msg_iovlen: usize,
-    msg_control: *mut MsgControl,
+    msg_control: *mut CMsgHdr,
     msg_controllen: usize,
     msg_flags: i32,
     _n: marker::PhantomData<&'nm mut Socklen>,
     _o: marker::PhantomData<&'io mut [IoVecMut<'io>]>,
-    _c: marker::PhantomData<&'ct mut MsgControl>,
+    _c: marker::PhantomData<&'ct mut CMsgHdr>,
 }
 
 impl<'nm, 'io, 'ct> MsgHdrMut<'nm, 'io, 'ct> {
@@ -122,7 +123,7 @@ impl<'nm, 'io, 'ct> MsgHdrMut<'nm, 'io, 'ct> {
         name: &'nm mut SockAddr,
         namelen: Socklen,
         iov: &'io mut [IoVecMut<'io>],
-        control: &'ct mut MsgControl,
+        control: &'ct mut CMsgHdr,
         controllen: usize,
     ) -> Self {
         new_hdr!(name, namelen, iov.as_mut_ptr(), iov.len(), control, controllen)
@@ -142,7 +143,7 @@ impl<'io, 'ct> MsgHdrMut<'static, 'io, 'ct> {
     #[inline]
     pub const fn new_cmsg(
         iov: &'io mut [IoVecMut<'io>],
-        control: &'ct mut MsgControl,
+        control: &'ct mut CMsgHdr,
         controllen: usize,
     ) -> Self {
         new_hdr!(ptr::null_mut(), 0, iov.as_mut_ptr(), iov.len(), control, controllen)
@@ -173,14 +174,6 @@ impl fmt::Debug for MsgHdrMut<'_, '_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("MsgHdrMut").finish_non_exhaustive()
     }
-}
-
-// ===== Control =====
-
-/// Control message.
-#[derive(Debug)]
-pub struct MsgControl {
-    _p: [u8; 0],
 }
 
 // ===== MsgFlags =====
