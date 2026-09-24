@@ -1,25 +1,26 @@
 //! Socket message.
-use core::{ffi, fmt, marker};
+use core::{fmt, marker, ptr};
 
+use crate::flags;
 use crate::io::{IoVec, IoVecMut};
-use crate::net::raw;
+use crate::net::addr::SockAddr;
+use crate::net::raw::{self, Socklen};
 
-// ===== AncillaryData =====
-
-/// Ancillary data.
-pub trait AncillaryData: sealed::Sealed {}
-
-pub(super) mod sealed {
-    pub trait Sealed {
-        /// Returns the pointer to the buffer.
-        fn as_ptr(&self) -> *const super::ffi::c_void;
-
-        /// Returns the pointer to the buffer.
-        fn as_mut_ptr(&mut self) -> *mut super::ffi::c_void;
-
-        /// Returns the buffer length with the padding.
-        fn space(&self) -> usize;
-    }
+macro_rules! new_hdr {
+    ($n:expr, $nl:expr, $v:expr, $vl:expr, $c:expr, $cl:expr) => {
+        Self {
+            msg_name: $n,
+            msg_namelen: $nl,
+            msg_iov: $v,
+            msg_iovlen: $vl,
+            msg_control: $c,
+            msg_controllen: $cl,
+            msg_flags: 0,
+            _n: marker::PhantomData,
+            _o: marker::PhantomData,
+            _c: marker::PhantomData,
+        }
+    };
 }
 
 // ===== MsgHdr =====
@@ -28,67 +29,68 @@ pub(super) mod sealed {
 ///
 /// See `sendmsg(2)`.
 #[repr(C)]
-pub struct MsgHdr<'io, 'ct> {
-    hdr: raw::msghdr,
-    _p: marker::PhantomData<&'io [IoVec<'io>]>,
-    _q: marker::PhantomData<&'ct ()>,
+pub struct MsgHdr<'nm, 'io, 'ct> {
+    msg_name: *const SockAddr,
+    msg_namelen: Socklen,
+    msg_iov: *const IoVec<'io>,
+    msg_iovlen: usize,
+    msg_control: *const MsgControl,
+    msg_controllen: usize,
+    msg_flags: i32,
+    _n: marker::PhantomData<&'nm Socklen>,
+    _o: marker::PhantomData<&'io [IoVec<'io>]>,
+    _c: marker::PhantomData<&'ct MsgControl>,
 }
 
-impl<'io> MsgHdr<'io, 'static> {
+impl<'nm, 'io, 'ct> MsgHdr<'nm, 'io, 'ct> {
     /// Creates new [`MsgHdr`].
     #[inline]
-    pub const fn new(iov: &'io [IoVec<'io>]) -> Self {
-        Self {
-            hdr: raw::msghdr {
-                msg_name: 0 as _,
-                msg_namelen: 0,
-                msg_iov: iov.as_ptr().cast_mut().cast(),
-                msg_iovlen: iov.len(),
-                msg_control: 0 as _,
-                msg_controllen: 0,
-                msg_flags: 0,
-            },
-            _p: marker::PhantomData,
-            _q: marker::PhantomData,
-        }
+    pub const fn new(
+        name: &'nm SockAddr,
+        namelen: Socklen,
+        iov: &'io [IoVec<'io>],
+        control: &'ct MsgControl,
+        controllen: usize,
+    ) -> Self {
+        new_hdr!(name, namelen, iov.as_ptr(), iov.len(), control, controllen)
     }
 }
 
-impl<'io, 'ct> MsgHdr<'io, 'ct> {
-    /// Creates new [`MsgHdr`].
+impl<'io> MsgHdr<'static, 'io, 'static> {
+    /// Creates new [`MsgHdr`] with only iovecs.
     #[inline]
-    pub fn with_cmsg<C: AncillaryData>(iov: &'io [IoVec<'io>], cmsg: &'ct C) -> Self {
-        Self {
-            hdr: raw::msghdr {
-                msg_name: 0 as _,
-                msg_namelen: 0,
-                msg_iov: iov.as_ptr().cast_mut().cast(),
-                msg_iovlen: iov.len(),
-                msg_control: cmsg.as_ptr().cast_mut().cast(),
-                msg_controllen: cmsg.space(),
-                msg_flags: 0,
-            },
-            _p: marker::PhantomData,
-            _q: marker::PhantomData,
-        }
+    pub const fn new_iov(iov: &'io [IoVec<'io>]) -> Self {
+        new_hdr!(ptr::null_mut(), 0, iov.as_ptr(), iov.len(), ptr::null_mut(), 0)
     }
 }
 
-impl<'io, 'ct> MsgHdr<'io, 'ct> {
-    /// Returns the iovecs length.
+impl<'io, 'ct> MsgHdr<'static, 'io, 'ct> {
+    /// Creates new [`MsgHdr`] with iovecs as message control.
+    #[inline]
+    pub const fn new_cmsg(
+        iov: &'io [IoVec<'io>],
+        control: &'ct MsgControl,
+        controllen: usize,
+    ) -> Self {
+        new_hdr!(ptr::null_mut(), 0, iov.as_ptr(), iov.len(), control, controllen)
+    }
+}
+
+impl MsgHdr<'_, '_, '_> {
+    /// Returns the message iovecs count.
     #[inline]
     pub const fn iov_len(&self) -> usize {
-        self.hdr.msg_iovlen
+        self.msg_iovlen
     }
 
-    /// Returns the control message length.
+    /// Returns the message control length.
     #[inline]
-    pub const fn cmsg_len(&self) -> usize {
-        self.hdr.msg_controllen
+    pub const fn control_len(&self) -> usize {
+        self.msg_controllen
     }
 }
 
-impl<'io, 'ct> fmt::Debug for MsgHdr<'io, 'ct> {
+impl fmt::Debug for MsgHdr<'_, '_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("MsgHdr").finish_non_exhaustive()
     }
@@ -100,108 +102,113 @@ impl<'io, 'ct> fmt::Debug for MsgHdr<'io, 'ct> {
 ///
 /// See `recvmsg(2)`.
 #[repr(C)]
-pub struct MsgHdrMut<'io, 'ct> {
-    hdr: raw::msghdr,
-    _p: marker::PhantomData<&'io mut [IoVec<'io>]>,
-    _q: marker::PhantomData<&'ct mut ()>,
+pub struct MsgHdrMut<'nm, 'io, 'ct> {
+    msg_name: *mut SockAddr,
+    msg_namelen: Socklen,
+    msg_iov: *mut IoVecMut<'io>,
+    msg_iovlen: usize,
+    msg_control: *mut MsgControl,
+    msg_controllen: usize,
+    msg_flags: i32,
+    _n: marker::PhantomData<&'nm mut Socklen>,
+    _o: marker::PhantomData<&'io mut [IoVecMut<'io>]>,
+    _c: marker::PhantomData<&'ct mut MsgControl>,
 }
 
-impl<'io> MsgHdrMut<'io, 'static> {
+impl<'nm, 'io, 'ct> MsgHdrMut<'nm, 'io, 'ct> {
     /// Creates new [`MsgHdrMut`].
     #[inline]
-    pub const fn new(iov: &'io mut [IoVecMut<'io>]) -> Self {
-        Self {
-            hdr: raw::msghdr {
-                msg_name: 0 as _,
-                msg_namelen: 0,
-                msg_iov: iov.as_mut_ptr().cast(),
-                msg_iovlen: iov.len(),
-                msg_control: 0 as _,
-                msg_controllen: 0,
-                msg_flags: 0,
-            },
-            _p: marker::PhantomData,
-            _q: marker::PhantomData,
-        }
+    pub const fn new(
+        name: &'nm mut SockAddr,
+        namelen: Socklen,
+        iov: &'io mut [IoVecMut<'io>],
+        control: &'ct mut MsgControl,
+        controllen: usize,
+    ) -> Self {
+        new_hdr!(name, namelen, iov.as_mut_ptr(), iov.len(), control, controllen)
     }
 }
 
-impl<'io, 'ct> MsgHdrMut<'io, 'ct> {
-    /// Creates new [`MsgHdrMut`].
+impl<'io> MsgHdrMut<'static, 'io, 'static> {
+    /// Creates new [`MsgHdrMut`] with only iovecs.
     #[inline]
-    pub fn with_cmsg<C: AncillaryData>(iov: &'io mut [IoVecMut<'io>], cmsg: &'ct mut C) -> Self {
-        Self {
-            hdr: raw::msghdr {
-                msg_name: 0 as _,
-                msg_namelen: 0,
-                msg_iov: iov.as_mut_ptr().cast(),
-                msg_iovlen: iov.len(),
-                msg_control: cmsg.as_mut_ptr().cast(),
-                msg_controllen: cmsg.space(),
-                msg_flags: 0,
-            },
-            _p: marker::PhantomData,
-            _q: marker::PhantomData,
-        }
+    pub const fn new_iov(iov: &'io mut [IoVecMut<'io>]) -> Self {
+        new_hdr!(ptr::null_mut(), 0, iov.as_mut_ptr(), iov.len(), ptr::null_mut(), 0)
     }
 }
 
-impl<'io, 'ct> MsgHdrMut<'io, 'ct> {
-    /// Returns the iovecs length.
+impl<'io, 'ct> MsgHdrMut<'static, 'io, 'ct> {
+    /// Creates new [`MsgHdrMut`] with iovecs as message control.
+    #[inline]
+    pub const fn new_cmsg(
+        iov: &'io mut [IoVecMut<'io>],
+        control: &'ct mut MsgControl,
+        controllen: usize,
+    ) -> Self {
+        new_hdr!(ptr::null_mut(), 0, iov.as_mut_ptr(), iov.len(), control, controllen)
+    }
+}
+
+impl MsgHdrMut<'_, '_, '_> {
+    /// Returns the message iovecs count.
     #[inline]
     pub const fn iov_len(&self) -> usize {
-        self.hdr.msg_iovlen
+        self.msg_iovlen
     }
 
-    /// Returns the control message length.
+    /// Returns the message control length.
     #[inline]
     pub const fn cmsg_len(&self) -> usize {
-        self.hdr.msg_controllen
+        self.msg_controllen
     }
 
     /// Returns the message flags.
     #[inline]
     pub const fn flags(&self) -> MsgFlags {
-        MsgFlags(self.hdr.msg_flags)
+        MsgFlags(self.msg_flags)
     }
 }
 
-impl<'io, 'ct> fmt::Debug for MsgHdrMut<'io, 'ct> {
+impl fmt::Debug for MsgHdrMut<'_, '_, '_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("MsgHdrMut").finish_non_exhaustive()
     }
 }
 
+// ===== Control =====
+
+/// Control message.
+#[derive(Debug)]
+pub struct MsgControl {
+    _p: [u8; 0],
+}
+
 // ===== MsgFlags =====
 
 /// [`MsgHdr`] flags.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct MsgFlags(i32);
 
-macro_rules! def {
-    ($($(#[$doc:meta])* fn $f:ident(), $val:ident;)*) => {
-        impl MsgFlags {$(
-            $(#[$doc])*
-            pub const fn $f(&self) -> bool {
-                self.0 & raw::$val != 0
-            }
-        )*}
-    };
+flags::impl_bitops_simple!(MsgFlags);
+
+impl MsgFlags {
+    /// `MSG_EOR`
+    pub const EOR: MsgFlags = MsgFlags(raw::MSG_EOR);
+    /// `MSG_TRUNC`
+    pub const TRUNC: MsgFlags = MsgFlags(raw::MSG_TRUNC);
+    /// `MSG_CTRUNC`
+    pub const CTRUNC: MsgFlags = MsgFlags(raw::MSG_CTRUNC);
+    /// `MSG_OOB`
+    pub const OOB: MsgFlags = MsgFlags(raw::MSG_OOB);
+    /// `MSG_ERRQUEUE`
+    pub const ERRQUEUE: MsgFlags = MsgFlags(raw::MSG_ERRQUEUE);
+    /// `MSG_CMSG_CLOEXEC`
+    pub const CMSG_CLOEXEC: MsgFlags = MsgFlags(raw::MSG_CMSG_CLOEXEC);
 }
-def! {
-    /// Indicates end-of-record; the data returned completed a record (generally, used with sockets
-    /// of type `SOCK_SEQPACKET`).
-    fn has_eor(), MSG_EOR;
-    /// Indicates that the trailing portion of a datagram was discarded because the datagram was
-    /// larger than the buffer supplied.
-    fn has_trunc(), MSG_TRUNC;
-    /// Indicates that some control data was discarded due to lack of space in the buffer for
-    /// ancillary data.
-    fn has_ctrunc(), MSG_CTRUNC;
-    /// Is returned to indicate that expedited or out-of-band data was received.
-    fn has_oob(), MSG_OOB;
-    /// Indicates that no data was received but an extended error from the socket error queue.
-    fn has_errqueue(), MSG_ERRQUEUE;
-    /// Indicates that `MSG_CMSG_CLOEXEC` was specified in the flags argument of `recvmsg()`.
-    fn has_cmsg_cloexec(), MSG_CMSG_CLOEXEC;
+
+impl From<MsgFlags> for i32 {
+    #[inline]
+    fn from(value: MsgFlags) -> Self {
+        value.0
+    }
 }

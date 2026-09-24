@@ -1,7 +1,6 @@
 //! Socket control message.
-use core::{ffi, marker, mem};
+use core::{marker, mem};
 
-use crate::net::msg::{AncillaryData, sealed};
 use crate::net::raw;
 
 // ===== CMsgKind =====
@@ -86,6 +85,18 @@ impl<T: CMsgKind + ?Sized, const N: usize> CMsgArray<T, N> {
         Self { hdr, data, _kind: marker::PhantomData }
     }
 
+    /// Cast to [`MsgControl`].
+    #[inline]
+    pub const fn as_control(&self) -> &MsgControl {
+        unsafe { &*(self as *const _ as *const _) }
+    }
+
+    /// Cast to [`MsgControl`].
+    #[inline]
+    pub const fn as_mut_control(&mut self) -> &mut MsgControl {
+        unsafe { &mut *(self as *mut _ as *mut _) }
+    }
+
     /// Returns length of the initialized data.
     #[inline]
     pub const fn len(&self) -> usize {
@@ -97,24 +108,5 @@ impl<T: CMsgKind + ?Sized, const N: usize> CMsgArray<T, N> {
     pub fn data(&self) -> &[T::Data] {
         // SAFETY: the length is set since the constructor or by the kernel
         unsafe { self.data.get_unchecked(..self.len()).assume_init_ref() }
-    }
-}
-
-impl<T: CMsgKind + ?Sized, const N: usize> AncillaryData for CMsgArray<T, N> {}
-impl<T: CMsgKind + ?Sized, const N: usize> sealed::Sealed for CMsgArray<T, N> {
-    #[inline]
-    fn as_ptr(&self) -> *const ffi::c_void {
-        self as *const _ as _
-    }
-
-    #[inline]
-    fn as_mut_ptr(&mut self) -> *mut ffi::c_void {
-        self as *mut _ as _
-    }
-
-    #[inline]
-    fn space(&self) -> usize {
-        // same result using `CMSG_SPACE`
-        size_of::<Self>()
     }
 }

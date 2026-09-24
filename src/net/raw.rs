@@ -84,18 +84,4 @@ pub struct cmsghdr {
 
 // ===== bits/socket.h =====
 
-/// `recvmsg(2)` `msghdr` struct.
-///
-/// In the kernel, the struct name is `user_msghdr`, that have the same layout with different field
-/// types.
-#[repr(C)]
-pub struct msghdr {
-    pub msg_name: *mut ffi::c_void,
-    pub msg_namelen: Socklen,
-    /// `*mut iovec`
-    pub msg_iov: *mut ffi::c_void,
-    pub msg_iovlen: usize,
-    pub msg_control: *mut ffi::c_void,
-    pub msg_controllen: usize,
-    pub msg_flags: i32,
-}
+// struct msghdr
