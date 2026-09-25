@@ -1,5 +1,5 @@
 //! [`Epoll`] associated types.
-use core::mem::MaybeUninit;
+use core::mem::{self, MaybeUninit};
 
 use crate::fd::{AsFd, OwnedFd};
 use crate::sys::{Error, arch};
@@ -39,6 +39,19 @@ impl Epoll {
         timeout: i32,
     ) -> Result<usize, Error<arch::sys_epoll_wait>> {
         sys::call!(sys_epoll_wait, self.as_raw_fd(), buf.as_mut_ptr(), buf.len(), timeout)
+    }
+
+    /// Waits for events `epoll_wait(2)`, returns the events as slice.
+    #[inline]
+    pub fn wait_to_slice<'a>(
+        &self,
+        buf: &'a mut [MaybeUninit<Event>],
+        timeout: i32,
+    ) -> Result<&'a mut [Event], Error<arch::sys_epoll_wait>> {
+        self.wait(buf, timeout).map(|new_len| {
+            // SAFETY: `new_len` is initialized by the kernel
+            unsafe { mem::transmute(buf.get_unchecked_mut(..new_len)) }
+        })
     }
 }
 
@@ -171,7 +184,7 @@ impl Epoll {
 
 fn optref(opt: Option<&Event>) -> *const Event {
     // this will generate to just a `mov`
-    opt.map_or(core::ptr::null(), |e|e as *const _)
+    opt.map_or(core::ptr::null(), |e| e as *const _)
 }
 
 // include/uapi/linux/eventpoll.h
@@ -193,3 +206,7 @@ const EPOLLEXCLUSIVE: u32 = 1 << 28;
 const EPOLLWAKEUP: u32 = 1 << 29;
 const EPOLLONESHOT: u32 = 1 << 30;
 const EPOLLET: u32 = 1 << 31;
+
+// const EPOLL_IOC_TYPE: i32 = 0x8A;
+// const EPIOCSPARAMS: i32 = _IOW(EPOLL_IOC_TYPE, 0x01, struct epoll_params);
+// const EPIOCGPARAMS: i32 = _IOR(EPOLL_IOC_TYPE, 0x02, struct epoll_params);
