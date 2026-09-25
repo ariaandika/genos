@@ -61,6 +61,7 @@ pub mod flags;
 
 // ===== syscalls =====
 
+pub mod alloc;
 pub mod event;
 pub mod fs;
 pub mod io;
