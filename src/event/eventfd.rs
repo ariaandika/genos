@@ -14,8 +14,8 @@ fd::impl_fd_simple!(Eventfd);
 impl Eventfd {
     /// Creates new [`Eventfd`] (`eventfd(2)`).
     #[inline]
-    pub fn create(initval: u32, flags: i32) -> Result<Self, Error<arch::sys_eventfd2>> {
-        sys::call_rd!(sys_eventfd2, initval, flags)
+    pub fn create(initval: u32, flags: Flags) -> Result<Self, Error<arch::sys_eventfd2>> {
+        sys::call_rd!(sys_eventfd2, initval, flags.0)
     }
 }
 
