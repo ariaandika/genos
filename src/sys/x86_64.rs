@@ -21,6 +21,7 @@ defv2! {
     1   common  write               sys_write
     2   common  open                sys_open
     3   common  close               sys_close
+    7   common  poll                sys_poll
     8   common  lseek               sys_lseek
     9   common  mmap                sys_mmap
     10  common  mprotect            sys_mprotect

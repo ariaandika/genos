@@ -4,5 +4,6 @@ pub use epoll::Epoll;
 #[doc(inline)]
 pub use eventfd::Eventfd;
 
+pub mod poll;
 pub mod epoll;
 pub mod eventfd;
