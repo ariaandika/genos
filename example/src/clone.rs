@@ -1,12 +1,26 @@
+use core::mem::MaybeUninit;
+
+use genos::event::Eventfd;
+use genos::event::poll::Pollfd;
+use genos::fd::{AsFd, BorrowedFd};
 use genos::ffi::Char;
+use genos::io;
 use genos::process::{CloneArgs, clone, exit};
 use genos::sys::arch;
 
 use crate::println;
 
-extern "C" fn thread(name: &Char) -> ! {
+extern "C" fn thread(data: &[usize; 2]) -> ! {
+    let [fd, name] = data;
+
+    let name = unsafe { &*(*name as *const Char) };
     println!("[C] {:?}({:?})", name, name as *const _);
     println!("[C] tls: {:?}", unsafe { arch::rdfsbase() } as *const u8);
+
+    let fd = unsafe { BorrowedFd::borrow_raw(*fd as i32) };
+    let val = 4usize.to_ne_bytes();
+    io::write(&fd, &val).unwrap();
+
     exit(0);
 }
 
@@ -15,12 +29,16 @@ static NAME: &Char = Char::new(c"welcome");
 pub fn clone3_example() {
     use clone::Flags as C;
 
+    let fd = Eventfd::create(0, Eventfd::NONBLOCK).unwrap();
+
     let flags = C::VM | C::FS | C::FILES | C::SIGHAND | C::THREAD | C::SETTLS;
 
     let mut stack = [0usize; 512];
+    let (stack, data) = stack.split_last_chunk_mut().unwrap();
     let (stack, args) = stack.split_last_chunk_mut().unwrap();
 
-    *args = [NAME.as_ptr() as _, thread as *const () as _];
+    *data = [fd.as_raw_fd() as _, NAME.as_ptr() as _];
+    *args = [data.as_ptr() as _, thread as *const () as _];
 
     println!("[P] child stack: {:?}", args.as_ptr());
     println!("[P] child tls: {:?}", NAME.as_ptr());
@@ -40,23 +58,10 @@ pub fn clone3_example() {
     };
     unsafe { clone.clone3().unwrap() };
 
-    nanosleep(1);
-    println!("[P] child stack: {:?}", args.as_ptr());
-}
+    Pollfd::new(&fd, Pollfd::IN).poll(-1).unwrap();
+    let mut buf = [const { MaybeUninit::uninit() }; size_of::<usize>()];
+    io::read(&fd, &mut buf).unwrap();
+    let value = usize::from_ne_bytes(unsafe { MaybeUninit::from(buf).assume_init() });
 
-fn nanosleep(sec: usize) -> isize {
-    let s = [sec, 0];
-    unsafe {
-        let ret;
-        core::arch::asm!(
-            "syscall",
-            inlateout("rax") 35usize => ret,
-            in("rdi") s.as_ptr(),
-            in("rsi") 0usize,
-            lateout("rcx") _,
-            lateout("r11") _,
-            options(nostack, preserves_flags)
-        );
-        ret
-    }
+    println!("[P] child notify: {}", value);
 }
