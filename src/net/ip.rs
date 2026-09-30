@@ -1,4 +1,3 @@
-//! IPv4 socket address.
 use core::mem::MaybeUninit;
 use core::{ffi, fmt};
 

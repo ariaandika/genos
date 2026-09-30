@@ -1,4 +1,3 @@
-//! Socket control message.
 use core::{marker, mem, ops};
 
 use crate::net::raw;

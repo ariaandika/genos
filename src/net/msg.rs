@@ -1,4 +1,3 @@
-//! Socket message.
 use core::{fmt, marker, ptr};
 
 use crate::flags;
@@ -165,8 +164,8 @@ impl MsgHdrMut<'_, '_, '_> {
 
     /// Returns the message flags.
     #[inline]
-    pub const fn flags(&self) -> MsgFlags {
-        MsgFlags(self.msg_flags)
+    pub const fn flags(&self) -> MsgHdrFlags {
+        MsgHdrFlags(self.msg_flags)
     }
 }
 
@@ -176,32 +175,32 @@ impl fmt::Debug for MsgHdrMut<'_, '_, '_> {
     }
 }
 
-// ===== MsgFlags =====
+// ===== MsgHdrFlags =====
 
 /// [`MsgHdr`] flags.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct MsgFlags(i32);
+pub struct MsgHdrFlags(i32);
 
-flags::impl_bitops_simple!(MsgFlags);
+flags::impl_bitops_simple!(MsgHdrFlags);
 
-impl MsgFlags {
+impl MsgHdrFlags {
     /// `MSG_EOR`
-    pub const EOR: MsgFlags = MsgFlags(raw::MSG_EOR);
+    pub const EOR: Self = Self(raw::MSG_EOR);
     /// `MSG_TRUNC`
-    pub const TRUNC: MsgFlags = MsgFlags(raw::MSG_TRUNC);
+    pub const TRUNC: Self = Self(raw::MSG_TRUNC);
     /// `MSG_CTRUNC`
-    pub const CTRUNC: MsgFlags = MsgFlags(raw::MSG_CTRUNC);
+    pub const CTRUNC: Self = Self(raw::MSG_CTRUNC);
     /// `MSG_OOB`
-    pub const OOB: MsgFlags = MsgFlags(raw::MSG_OOB);
+    pub const OOB: Self = Self(raw::MSG_OOB);
     /// `MSG_ERRQUEUE`
-    pub const ERRQUEUE: MsgFlags = MsgFlags(raw::MSG_ERRQUEUE);
+    pub const ERRQUEUE: Self = Self(raw::MSG_ERRQUEUE);
     /// `MSG_CMSG_CLOEXEC`
-    pub const CMSG_CLOEXEC: MsgFlags = MsgFlags(raw::MSG_CMSG_CLOEXEC);
+    pub const CMSG_CLOEXEC: Self = Self(raw::MSG_CMSG_CLOEXEC);
 }
 
-impl From<MsgFlags> for i32 {
+impl From<MsgHdrFlags> for i32 {
     #[inline]
-    fn from(value: MsgFlags) -> Self {
+    fn from(value: MsgHdrFlags) -> Self {
         value.0
     }
 }

@@ -2,15 +2,17 @@ use core::ffi;
 
 use crate::fd;
 
+// ===== bits/sockaddr.h =====
+
+/// `sa_family_t` (`sockaddr(3type)`).
+pub type SaFamily = ffi::c_ushort;
+
 // ===== bits/socket.h =====
 
-/// `sockaddr(3type)`
+/// `socklen_t` (`sockaddr(3type)`).
 pub type Socklen = u32;
 
 // ===== include/linux/socket.h =====
-
-/// `sockaddr(3type)`
-pub type SaFamily = ffi::c_ushort;
 
 pub const SCM_RIGHTS: i32 = 0x01;
 pub const SCM_CREDENTIALS: i32 = 0x02;

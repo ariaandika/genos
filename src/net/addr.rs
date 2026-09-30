@@ -1,11 +1,10 @@
-//! Socket address.
 use core::ffi;
 
 use crate::net::{SaFamily, raw};
 
 // ===== SockAddr =====
 
-/// `sockaddr(3type)`
+/// Generic socket address `sockaddr(3type)`.
 #[derive(Debug)]
 #[repr(C)]
 pub struct SockAddr {
@@ -32,7 +31,9 @@ impl Family {
 }
 
 impl Family {
-    pub(super) const fn sa_family(self) -> SaFamily {
+    /// Convert to [`SaFamily`].
+    #[inline]
+    pub const fn sa_family(self) -> SaFamily {
         self.0 as _
     }
 }

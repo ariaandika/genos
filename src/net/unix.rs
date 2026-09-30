@@ -1,4 +1,3 @@
-//! UNIX socket address.
 use core::{ffi, fmt, marker};
 
 use crate::ffi::Char;

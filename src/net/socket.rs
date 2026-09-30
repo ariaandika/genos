@@ -11,7 +11,7 @@ use crate::{fd, flags, sys};
 
 // ===== Socket =====
 
-/// Communication endpoint.
+/// Communication endpoint (`socket(7)`).
 #[derive(Debug)]
 pub struct Socket(OwnedFd);
 
@@ -152,6 +152,15 @@ impl Socket {
         let addrlen = sys::optmut(addrlen);
         sys::call_rd!(sys_accept4, self.as_raw_fd(), addr, addrlen, flags.0)
     }
+}
+
+impl Socket {
+    /// `AF_UNIX`
+    pub const UNIX: Family = Family::UNIX;
+    /// `AF_LOCAL`
+    pub const LOCAL: Family = Family::LOCAL;
+    /// `AF_INET`
+    pub const INET: Family = Family::INET;
 }
 
 // ===== Type =====
