@@ -5,8 +5,6 @@ pub use addr::{Family, SockAddr};
 pub use unix::SockAddrUn;
 pub use ip::SockAddrIn;
 
-pub use option::{OptInt, OptLevel, OptName, OptValue};
-
 #[doc(inline)]
 pub use socket::Socket;
 
@@ -14,7 +12,8 @@ pub use socket::Socket;
 
 mod raw;
 
-mod option;
+pub mod opt;
+
 mod addr;
 mod msg;
 mod cmsg;

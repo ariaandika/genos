@@ -1,6 +1,7 @@
 use core::{marker, mem, ops};
 
-use crate::net::{OptLevel, raw};
+use crate::net::opt::OptLevel;
+use crate::net::raw;
 
 // ===== CMsgKind =====
 

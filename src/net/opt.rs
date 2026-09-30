@@ -11,19 +11,6 @@ use crate::net::{Socklen, raw};
 pub struct OptLevel(i32);
 
 impl OptLevel {
-    /// `SOL_IP`
-    pub const SOL_IP: Self = Self(raw::SOL_IP);
-    /// `SOL_SOCKET`
-    pub const SOL_SOCKET: Self = Self(raw::SOL_SOCKET);
-    /// `SOL_TCP`
-    pub const SOL_TCP: Self = Self(raw::SOL_TCP);
-    /// `SOL_UDP`
-    pub const SOL_UDP: Self = Self(raw::SOL_UDP);
-    /// `SOL_IPV6`
-    pub const SOL_IPV6: Self = Self(raw::SOL_IPV6);
-    /// `SOL_RAW`
-    pub const SOL_RAW: Self = Self(raw::SOL_RAW);
-
     /// Returns the raw integer value.
     #[inline]
     pub const fn to_raw(self) -> i32 {
@@ -38,6 +25,19 @@ impl From<OptLevel> for i32 {
     }
 }
 
+/// `SOL_IP`
+pub const IP: OptLevel = OptLevel(raw::SOL_IP);
+/// `SOL_SOCKET`
+pub const SOCKET: OptLevel = OptLevel(raw::SOL_SOCKET);
+/// `SOL_TCP`
+pub const TCP: OptLevel = OptLevel(raw::SOL_TCP);
+/// `SOL_UDP`
+pub const UDP: OptLevel = OptLevel(raw::SOL_UDP);
+/// `SOL_IPV6`
+pub const IPV6: OptLevel = OptLevel(raw::SOL_IPV6);
+/// `SOL_RAW`
+pub const RAW: OptLevel = OptLevel(raw::SOL_RAW);
+
 // ===== OptName =====
 
 /// Socket options name (`socket(7)`).
@@ -45,22 +45,20 @@ impl From<OptLevel> for i32 {
 #[repr(transparent)]
 pub struct OptName(i32);
 
-impl OptName {
-    /// `SO_DEBUG`
-    pub const DEBUG: OptName = OptName(raw::SO_DEBUG);
-    /// `SO_REUSEADDR`
-    pub const REUSEADDR: OptName = OptName(raw::SO_REUSEADDR);
-    /// `SO_TYPE`
-    pub const TYPE: OptName = OptName(raw::SO_TYPE);
-    /// `SO_ERROR`
-    pub const ERROR: OptName = OptName(raw::SO_ERROR);
-    /// `SO_DONTROUTE`
-    pub const DONTROUTE: OptName = OptName(raw::SO_DONTROUTE);
-    /// `SO_BROADCAST`
-    pub const BROADCAST: OptName = OptName(raw::SO_BROADCAST);
-    /// `SO_KEEPALIVE`
-    pub const KEEPALIVE: OptName = OptName(raw::SO_KEEPALIVE);
-}
+/// `SO_DEBUG`
+pub const DEBUG: OptName = OptName(raw::SO_DEBUG);
+/// `SO_REUSEADDR`
+pub const REUSEADDR: OptName = OptName(raw::SO_REUSEADDR);
+/// `SO_TYPE`
+pub const TYPE: OptName = OptName(raw::SO_TYPE);
+/// `SO_ERROR`
+pub const ERROR: OptName = OptName(raw::SO_ERROR);
+/// `SO_DONTROUTE`
+pub const DONTROUTE: OptName = OptName(raw::SO_DONTROUTE);
+/// `SO_BROADCAST`
+pub const BROADCAST: OptName = OptName(raw::SO_BROADCAST);
+/// `SO_KEEPALIVE`
+pub const KEEPALIVE: OptName = OptName(raw::SO_KEEPALIVE);
 
 impl From<OptName> for i32 {
     #[inline]
@@ -77,12 +75,10 @@ pub struct OptValue {
     _p: marker::PhantomData<()>,
 }
 
-impl OptValue {
-    /// Create boolean integer option value.
-    #[inline]
-    pub const fn from_bool(boolean: bool) -> OptInt {
-        OptInt::new(boolean as i32)
-    }
+/// Create boolean integer option value.
+#[inline]
+pub const fn from_bool(boolean: bool) -> OptInt {
+    OptInt::new(boolean as i32)
 }
 
 // ===== values =====

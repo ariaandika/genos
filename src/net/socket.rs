@@ -3,7 +3,8 @@ use core::mem::MaybeUninit;
 
 use crate::fd::{AsFd, OwnedFd};
 use crate::net::msg::{MsgHdr, MsgHdrMut};
-use crate::net::{Family, OptLevel, OptName, OptValue, SockAddr, Socklen, raw};
+use crate::net::opt::{OptLevel, OptName, OptValue};
+use crate::net::{Family, SockAddr, Socklen, raw};
 use crate::sys::{Error, arch};
 use crate::{fd, flags, sys};
 
