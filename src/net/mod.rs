@@ -5,7 +5,7 @@ pub use addr::{Family, SockAddr};
 pub use unix::SockAddrUn;
 pub use ip::SockAddrIn;
 
-pub use option::{OptInt, OptName, OptValue};
+pub use option::{OptInt, OptLevel, OptName, OptValue};
 
 #[doc(inline)]
 pub use socket::Socket;
@@ -14,13 +14,10 @@ pub use socket::Socket;
 
 mod raw;
 
-// socket address abstractions
-
+mod option;
 mod addr;
 mod msg;
 mod cmsg;
-
-// socket message abstraction
 
 pub mod message {
     //! Socket message.
@@ -30,12 +27,7 @@ pub mod message {
     pub use super::unix::SCMRights;
 }
 
-// socket address implementation
-
 mod unix;
 mod ip;
 
-// `socket(2)`
-
-mod option;
 pub mod socket;

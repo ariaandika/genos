@@ -1,9 +1,44 @@
 //! Socket options.
 use core::marker;
 
-use crate::net::raw::{self, Socklen};
+use crate::net::{Socklen, raw};
 
-// ===== SockOption =====
+// ===== OptLevel =====
+
+/// Socket options level.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(transparent)]
+pub struct OptLevel(i32);
+
+impl OptLevel {
+    /// `SOL_IP`
+    pub const SOL_IP: Self = Self(raw::SOL_IP);
+    /// `SOL_SOCKET`
+    pub const SOL_SOCKET: Self = Self(raw::SOL_SOCKET);
+    /// `SOL_TCP`
+    pub const SOL_TCP: Self = Self(raw::SOL_TCP);
+    /// `SOL_UDP`
+    pub const SOL_UDP: Self = Self(raw::SOL_UDP);
+    /// `SOL_IPV6`
+    pub const SOL_IPV6: Self = Self(raw::SOL_IPV6);
+    /// `SOL_RAW`
+    pub const SOL_RAW: Self = Self(raw::SOL_RAW);
+
+    /// Returns the raw integer value.
+    #[inline]
+    pub const fn to_raw(self) -> i32 {
+        self.0
+    }
+}
+
+impl From<OptLevel> for i32 {
+    #[inline]
+    fn from(value: OptLevel) -> Self {
+        value.0
+    }
+}
+
+// ===== OptName =====
 
 /// Socket options name (`socket(7)`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

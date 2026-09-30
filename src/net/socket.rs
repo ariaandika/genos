@@ -2,10 +2,8 @@
 use core::mem::MaybeUninit;
 
 use crate::fd::{AsFd, OwnedFd};
-use crate::net::addr::{Family, SockAddr};
 use crate::net::msg::{MsgHdr, MsgHdrMut};
-use crate::net::option::{OptName, OptValue};
-use crate::net::raw::{self, Socklen};
+use crate::net::{Family, OptLevel, OptName, OptValue, SockAddr, Socklen, raw};
 use crate::sys::{Error, arch};
 use crate::{fd, flags, sys};
 
@@ -73,10 +71,11 @@ impl Socket {
     pub fn getopt(
         &self,
         name: OptName,
+        level: OptLevel,
         val: &mut OptValue,
         len: &mut Socklen,
     ) -> Result<(), Error<arch::sys_getsockopt>> {
-        sys::call!(sys_getsockopt, self.as_raw_fd(), raw::SOL_SOCKET, i32::from(name), val, len)
+        sys::call!(sys_getsockopt, self.as_raw_fd(), level.to_raw(), i32::from(name), val, len)
     }
 
     /// Set socket options (`setsockopt(2)`).
@@ -84,10 +83,11 @@ impl Socket {
     pub fn setopt(
         &self,
         name: OptName,
+        level: OptLevel,
         val: &OptValue,
         len: Socklen,
     ) -> Result<(), Error<arch::sys_setsockopt>> {
-        sys::call!(sys_setsockopt, self.as_raw_fd(), raw::SOL_SOCKET, i32::from(name), val, len)
+        sys::call!(sys_setsockopt, self.as_raw_fd(), level.to_raw(), i32::from(name), val, len)
     }
 
     /// Listen for connections on this socket (`listen(2)`).

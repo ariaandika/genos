@@ -32,6 +32,12 @@ pub const MSG_EOR: i32 = 0x80;
 pub const MSG_ERRQUEUE: i32 = 0x2000;
 pub const MSG_CMSG_CLOEXEC: i32 = 0x40000000;
 
+pub const SOL_IP: i32 = 0;
+pub const SOL_TCP: i32 = 6;
+pub const SOL_UDP: i32 = 17;
+pub const SOL_IPV6: i32 = 41;
+pub const SOL_RAW: i32 = 255;
+
 // ===== include/linux/net.h =====
 
 // enum sock_type
@@ -54,6 +60,13 @@ pub const SCM_MAX_FD: i32 = 253;
 // ===== include/uapi/linux/un.h =====
 
 pub const UNIX_PATH_MAX: usize = 108;
+
+// compatible with `SOL_*`
+// pub const IPPROTO_IP: i32 = 0;
+// pub const IPPROTO_TCP: i32 = 6;
+// pub const IPPROTO_UDP: i32 = 17;
+// pub const IPPROTO_TP: i32 = 29;
+// pub const IPPROTO_IPV6: i32 = 41;
 
 // ===== include/uapi/asm-generic/socket.h =====
 

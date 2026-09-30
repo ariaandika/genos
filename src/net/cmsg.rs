@@ -1,6 +1,6 @@
 use core::{marker, mem, ops};
 
-use crate::net::raw;
+use crate::net::{OptLevel, raw};
 
 // ===== CMsgKind =====
 
@@ -88,24 +88,29 @@ pub struct CMsgArray<T: CMsgKind + ?Sized, const N: usize> {
 impl<T: CMsgKind + ?Sized, const N: usize> CMsgArray<T, N> {
     /// Creates [`CMsgArray`] with uninitialized data.
     #[inline]
-    pub const fn uninit() -> Self {
+    pub const fn uninit(level: OptLevel) -> Self {
         let data = [const { mem::MaybeUninit::uninit() }; N];
-        Self::new_inner(data, size_of::<[T::Data; 0]>())
+        Self::new_inner(level, data, size_of::<[T::Data; 0]>())
     }
 
     /// Creates [`CMsgArray`] with given type and data.
     #[inline]
-    pub fn new(data: [T::Data; N]) -> Self {
+    pub fn new(level: OptLevel, data: [T::Data; N]) -> Self {
         // [`MaybeUninit::transpose`]: https://github.com/rust-lang/rust/issues/96097
+        // and `mem::transmute` refuses
         let data = mem::MaybeUninit::new(data).into();
-        Self::new_inner(data, size_of::<[T::Data; N]>())
+        Self::new_inner(level, data, size_of::<[T::Data; N]>())
     }
 
-    const fn new_inner(data: [mem::MaybeUninit<T::Data>; N], data_len: usize) -> Self {
+    const fn new_inner(
+        level: OptLevel,
+        data: [mem::MaybeUninit<T::Data>; N],
+        data_len: usize,
+    ) -> Self {
         const { assert!(raw::cmsg_space(size_of::<[T::Data; N]>()) == size_of::<Self>()) };
         let hdr = raw::cmsghdr {
             cmsg_len: raw::cmsg_len(data_len),
-            cmsg_level: raw::SOL_SOCKET,
+            cmsg_level: level.to_raw(),
             cmsg_type: T::TYPE.0,
         };
         Self { hdr, data, _kind: marker::PhantomData }
