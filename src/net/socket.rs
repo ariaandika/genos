@@ -4,6 +4,7 @@ use core::mem::MaybeUninit;
 use crate::fd::{AsFd, OwnedFd};
 use crate::net::addr::{Family, SockAddr};
 use crate::net::msg::{MsgHdr, MsgHdrMut};
+use crate::net::option::{OptName, OptValue};
 use crate::net::raw::{self, Socklen};
 use crate::sys::{Error, arch};
 use crate::{fd, flags, sys};
@@ -65,6 +66,28 @@ impl Socket {
         addrlen: &mut Socklen,
     ) -> Result<(), Error<arch::sys_getpeername>> {
         sys::call!(sys_getpeername, self.as_raw_fd(), addr, addrlen)
+    }
+
+    /// Get socket options (`getsockopt(2)`).
+    #[inline]
+    pub fn getopt(
+        &self,
+        name: OptName,
+        val: &mut OptValue,
+        len: &mut Socklen,
+    ) -> Result<(), Error<arch::sys_getsockopt>> {
+        sys::call!(sys_getsockopt, self.as_raw_fd(), raw::SOL_SOCKET, i32::from(name), val, len)
+    }
+
+    /// Set socket options (`setsockopt(2)`).
+    #[inline]
+    pub fn setopt(
+        &self,
+        name: OptName,
+        val: &OptValue,
+        len: Socklen,
+    ) -> Result<(), Error<arch::sys_setsockopt>> {
+        sys::call!(sys_setsockopt, self.as_raw_fd(), raw::SOL_SOCKET, i32::from(name), val, len)
     }
 
     /// Listen for connections on this socket (`listen(2)`).

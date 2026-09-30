@@ -57,6 +57,14 @@ pub const UNIX_PATH_MAX: usize = 108;
 
 pub const SOL_SOCKET: i32 = 1;
 
+pub const SO_DEBUG: i32 = 1;
+pub const SO_REUSEADDR: i32 = 2;
+pub const SO_TYPE: i32 = 3;
+pub const SO_ERROR: i32 = 4;
+pub const SO_DONTROUTE: i32 = 5;
+pub const SO_BROADCAST: i32 = 6;
+pub const SO_KEEPALIVE: i32 = 9;
+
 // ===== include/linux/socket.h =====
 
 /// `CMSG_ALIGN`

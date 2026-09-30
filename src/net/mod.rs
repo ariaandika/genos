@@ -1,7 +1,7 @@
 //! Networking primitives.
 #[doc(inline)]
 pub use socket::Socket;
-pub use raw::SaFamily;
+pub use raw::{SaFamily, Socklen};
 
 // ===== mods =====
 
@@ -20,4 +20,5 @@ pub mod ip;
 
 // `socket(2)`
 
+pub mod option;
 pub mod socket;

@@ -45,6 +45,8 @@ defv2! {
     50  common  listen              sys_listen
     51  common  getsockname         sys_getsockname
     52  common  getpeername         sys_getpeername
+    54  64      setsockopt          sys_setsockopt
+    55  64      getsockopt          sys_getsockopt
     56  common  clone               sys_clone
     57  common  fork                sys_fork
     59  64      execve              sys_execve
