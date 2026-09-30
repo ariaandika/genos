@@ -85,7 +85,7 @@ defv2! {
     435 common  clone3              sys_clone3
 }
 
-#[inline]
+#[inline(always)]
 pub(crate) unsafe fn call1_noret(nr: SysRaw, a1: i32) -> ! {
     // [ud2]: <https://doc.rust-lang.org/reference/inline-assembly.html#r-asm.options.supported-options.noreturn>
     unsafe {
@@ -97,6 +97,46 @@ pub(crate) unsafe fn call1_noret(nr: SysRaw, a1: i32) -> ! {
             options(nostack, noreturn)
         )
     }
+}
+
+/// Read the address, with given offset, stored at FS register.
+///
+/// # Safety
+///
+/// The current thread FS base points to a valid 64-bit memory region, and `OFF` is within that
+/// region.
+#[inline(always)]
+pub unsafe fn rdfs<const OFF: usize>() -> u64 {
+    let fs;
+    unsafe {
+        core::arch::asm!(
+            "mov {}, fs:[{off}]",
+            out(reg) fs,
+            off = const OFF,
+            options(nostack, preserves_flags, readonly)
+        );
+    }
+    fs
+}
+
+/// Perform `rdfsbase` instruction.
+///
+/// Note that this may not available.
+///
+/// # Safety
+///
+/// Current platform must support the `RDFSBASE` instruction (the `FSGSBASE` feature).
+#[inline(always)]
+pub unsafe fn rdfsbase() -> u64 {
+    let fs: u64;
+    unsafe {
+        core::arch::asm!(
+            "rdfsbase {}",
+            out(reg) fs,
+            options(nostack, preserves_flags, readonly)
+        );
+    }
+    fs
 }
 
 macro_rules! call_impl {
