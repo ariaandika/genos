@@ -4,9 +4,8 @@ use genos::event::Eventfd;
 use genos::event::poll::Pollfd;
 use genos::fd::{AsFd, BorrowedFd};
 use genos::ffi::Char;
-use genos::io;
 use genos::process::{CloneArgs, clone, exit};
-use genos::sys::arch;
+use genos::{arch, io};
 
 use crate::println;
 
