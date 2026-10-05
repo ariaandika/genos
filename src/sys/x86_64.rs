@@ -121,11 +121,9 @@ pub unsafe fn rdfs<const OFF: usize>() -> u64 {
 
 /// Perform `rdfsbase` instruction.
 ///
-/// Note that this may not available.
-///
 /// # Safety
 ///
-/// Current platform must support the `RDFSBASE` instruction (the `FSGSBASE` feature).
+/// Current platform must support the `RDFSBASE` instruction.
 #[inline(always)]
 pub unsafe fn rdfsbase() -> u64 {
     let fs: u64;
@@ -134,9 +132,59 @@ pub unsafe fn rdfsbase() -> u64 {
             "rdfsbase {}",
             out(reg) fs,
             options(nostack, preserves_flags, readonly)
-        );
-    }
+        )
+    };
     fs
+}
+
+/// Perform `rdgsbase` instruction.
+///
+/// # Safety
+///
+/// Current platform must support the `RDGSBASE` instruction.
+#[inline(always)]
+pub unsafe fn rdgsbase() -> u64 {
+    let gs: u64;
+    unsafe {
+        core::arch::asm!(
+            "rdgsbase {}",
+            out(reg) gs,
+            options(nostack, preserves_flags, readonly)
+        )
+    };
+    gs
+}
+
+/// Perform `wrfsbase` instruction.
+///
+/// # Safety
+///
+/// Current platform must support the `WRFSBASE` instruction.
+#[inline(always)]
+pub unsafe fn wrfsbase(value: u64) {
+    unsafe {
+        core::arch::asm!(
+            "wrfsbase {}",
+            in(reg) value,
+            options(nostack, preserves_flags, readonly)
+        )
+    };
+}
+
+/// Perform `wrgsbase` instruction.
+///
+/// # Safety
+///
+/// Current platform must support the `WRGSBASE` instruction.
+#[inline(always)]
+pub unsafe fn wrgsbase(value: u64) {
+    unsafe {
+        core::arch::asm!(
+            "wrgsbase {}",
+            in(reg) value,
+            options(nostack, preserves_flags, readonly)
+        )
+    };
 }
 
 macro_rules! call_impl {
