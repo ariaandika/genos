@@ -61,6 +61,7 @@ defv2! {
     87  common  unlink              sys_unlink
     88  common  symlink             sys_symlink
     110 common  getppid             sys_getppid
+    158 common  arch_prctl          sys_arch_prctl
     201 common  time                sys_time
     227 common  clock_settime       sys_clock_settime
     228 common  clock_gettime       sys_clock_gettime

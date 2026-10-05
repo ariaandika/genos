@@ -11,10 +11,16 @@ use crate::println;
 
 extern "C" fn thread(data: &[usize; 2]) -> ! {
     let [fd, name] = data;
+    let tls = unsafe { arch::rdfsbase() } as *mut u8;
+    let mut fs_base = 0 as _;
+
+    arch::ArchOp::GET_FS.arch_prctl(&raw mut fs_base as _).unwrap();
 
     let name = unsafe { &*(*name as *const Char) };
     println!("[C] {:?}({:?})", name, name as *const _);
-    println!("[C] tls: {:?}", unsafe { arch::rdfsbase() } as *const u8);
+    println!("[C] tls: {:?}", tls);
+
+    assert_eq!(tls, fs_base);
 
     let fd = unsafe { BorrowedFd::borrow_raw(*fd as i32) };
     let val = 4usize.to_ne_bytes();

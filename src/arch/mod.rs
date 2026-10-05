@@ -1,5 +1,8 @@
 //! Architecture intrinsics.
 pub use arch::*;
+pub use prctl::{ArchOp, arch_prctl};
+
+mod prctl;
 
 // ===== architecture =====
 
