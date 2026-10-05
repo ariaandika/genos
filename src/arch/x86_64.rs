@@ -100,7 +100,7 @@ pub(crate) unsafe fn call1_noret(nr: SysRaw, a1: i32) -> ! {
     }
 }
 
-/// Read the address, with given offset, stored at FS register.
+/// Read the FS base value, with given offset.
 ///
 /// # Safety
 ///
@@ -118,6 +118,26 @@ pub unsafe fn rdfs<const OFF: usize>() -> u64 {
         );
     }
     fs
+}
+
+/// Read the GS base value, with given offset.
+///
+/// # Safety
+///
+/// The current thread GS base points to a valid 64-bit memory region, and `OFF` is within that
+/// region.
+#[inline(always)]
+pub unsafe fn rdgs<const OFF: usize>() -> u64 {
+    let gs;
+    unsafe {
+        core::arch::asm!(
+            "mov {}, gs:[{off}]",
+            out(reg) gs,
+            off = const OFF,
+            options(nostack, preserves_flags, readonly)
+        );
+    }
+    gs
 }
 
 /// Perform `rdfsbase` instruction.
