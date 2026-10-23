@@ -64,16 +64,31 @@ impl<Id: SysId> error::Error for Error<Id> {}
 
 impl<Id: SysId> fmt::Debug for Error<Id> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        f.debug_struct("Error")
-            .field("code", &self.code)
-            .field("syscall", &Id::NAME)
-            .finish()
+        if f.alternate() {
+            f.debug_struct("Error")
+                .field("code", &self.code)
+                .field("syscall", &Id::NAME)
+                .finish()
+        } else {
+            fmt::Display::fmt(self, f)
+        }
     }
 }
 
 impl<Id: SysId> fmt::Display for Error<Id> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "`{}` returns -{}", Id::NAME, self.code.code())
+        let fmt = fmt::from_fn(|f| match self.code.name() {
+            Some(name) => write!(f, "{name}"),
+            None => write!(f, "-{}", self.code.code()),
+        });
+        write!(f, "`{}` returns `{}`", Id::NAME, fmt)
+    }
+}
+
+impl<Id> From<ErrCode> for Error<Id> {
+    #[inline]
+    fn from(code: ErrCode) -> Self {
+        Self { code, _id: PhantomData }
     }
 }
 

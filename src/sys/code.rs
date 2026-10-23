@@ -55,8 +55,16 @@ macro_rules! def_errno {
     ($($vis:vis const $name:ident: $ty:ty = $val:expr;)*) => {
         impl ErrCode {$(
             #[doc = concat!(" `", stringify!($name), "`")]
-            $vis const $name: $ty = Self(NonZeroI16::new($val as i16).unwrap().wrapping_neg());
+            $vis const $name: $ty = Self(NonZeroI16::new($val).unwrap().wrapping_neg());
         )*}
+        impl ErrCode {
+            pub(crate) const fn name(&self) -> Option<&'static str> {
+                match self.code() {
+                    $($val => Some(stringify!($name)),)*
+                    _ => None,
+                }
+            }
+        }
     };
 }
 def_errno! {
@@ -103,7 +111,6 @@ def_errno! {
     pub const ENOSYS: Self      = 38;
     pub const ENOTEMPTY: Self   = 39;
     pub const ELOOP: Self       = 40;
-    pub const EWOULDBLOCK: Self = Self::EAGAIN.code();
     pub const ENOMSG: Self      = 42;
     pub const EIDRM: Self       = 43;
     pub const ECHRNG: Self      = 44;
@@ -120,7 +127,6 @@ def_errno! {
     pub const ENOANO: Self      = 55;
     pub const EBADRQC: Self     = 56;
     pub const EBADSLT: Self     = 57;
-    pub const EDEADLOCK: Self   = Self::EDEADLK.code();
     pub const EBFONT: Self      = 59;
     pub const ENOSTR: Self      = 60;
     pub const ENODATA: Self     = 61;
@@ -137,7 +143,6 @@ def_errno! {
     pub const EMULTIHOP: Self   = 72;
     pub const EDOTDOT: Self     = 73;
     pub const EBADMSG: Self     = 74;
-    pub const EFSBADCRC: Self   = Self::EBADMSG.code();
     pub const EOVERFLOW: Self   = 75;
     pub const ENOTUNIQ: Self    = 76;
     pub const EBADFD: Self      = 77;
@@ -181,7 +186,6 @@ def_errno! {
     pub const EINPROGRESS: Self     = 115;
     pub const ESTALE: Self          = 116;
     pub const EUCLEAN: Self         = 117;
-    pub const EFSCORRUPTED: Self    = Self::EUCLEAN.code();
     pub const ENOTNAM: Self         = 118;
     pub const ENAVAIL: Self         = 119;
     pub const EISNAM: Self          = 120;
@@ -199,4 +203,14 @@ def_errno! {
     pub const ERFKILL: Self         = 132;
     pub const EHWPOISON: Self       = 133;
     pub const EFTYPE: Self          = 134;
+}
+impl ErrCode {
+    /// `EWOULDBLOCK`
+    pub const EWOULDBLOCK: Self = Self::EAGAIN;
+    /// `EDEADLOCK`
+    pub const EDEADLOCK: Self = Self::EDEADLK;
+    /// `EFSBADCRC`
+    pub const EFSBADCRC: Self = Self::EBADMSG;
+    /// `EFSCORRUPTED`
+    pub const EFSCORRUPTED: Self = Self::EUCLEAN;
 }
